@@ -22,20 +22,30 @@ else
     </div>
     <div class="cardx">
         <h2 class="h5">Novo lote</h2>
-        <div class="row g-2">
-            <div class="col-12 col-md-4"><select class="form-select" @bind="bioId">@foreach (var b in bios) { <option value="@b.Id">@b.Nome</option> }</select></div>
-            <div class="col-6 col-md-2"><input class="form-control" placeholder="Lote" @bind="lote" /></div>
-            <div class="col-3 col-md-1"><input type="number" step="any" class="form-control" @bind="qtd" /></div>
-            <div class="col-3 col-md-1"><input class="form-control" @bind="un" /></div>
-            <div class="col-6 col-md-2"><input type="date" class="form-control" @bind="validade" /></div>
-            <div class="col-6 col-md-2"><input type="number" step="any" class="form-control" placeholder="°C atual" @bind="temp" /></div>
+        <p class="hint">Campos com <span class="req"></span> são obrigatórios. A temperatura de armazenamento gera alerta se passar do limite do produto.</p>
+        <div class="row g-3">
+            <div class="col-12 col-md-6 field"><label class="req" for="e-bio">Produto (bioinsumo)</label>
+                <select id="e-bio" class="form-select" @bind="bioId">@foreach (var b in bios) { <option value="@b.Id">@b.Nome</option> }</select></div>
+            <div class="col-12 col-md-6 field"><label class="req" for="e-lote">Código do lote</label>
+                <input id="e-lote" class="form-control @Inv("lote")" placeholder="Ex.: L2026-045" maxlength="60" @bind="lote" />@Err("lote")</div>
+            <div class="col-6 col-md-3 field"><label class="req" for="e-qtd">Quantidade</label>
+                <input id="e-qtd" type="number" step="any" min="0.01" class="form-control @Inv("qtd")" @bind="qtd" />@Err("qtd")</div>
+            <div class="col-6 col-md-3 field"><label for="e-un">Unidade</label>
+                <select id="e-un" class="form-select" @bind="un"><option>L</option><option>kg</option><option>g</option><option>mL</option><option>doses</option><option>cartelas</option></select></div>
+            <div class="col-6 col-md-3 field"><label class="req" for="e-val">Validade</label>
+                <input id="e-val" type="date" class="form-control @Inv("val")" @bind="validade" />@Err("val")</div>
+            <div class="col-6 col-md-3 field"><label for="e-temp">Temp. armazenamento (°C)</label>
+                <input id="e-temp" type="number" step="any" min="-40" max="60" class="form-control" placeholder="Ex.: 6" @bind="temp" /><div class="hint">Opcional</div></div>
         </div>
-        <button class="btn btn-primary mt-2" @onclick="Salvar">Adicionar lote</button> <span class="small">@msg</span>
+        <div class="form-actions"><button class="btn btn-primary" @onclick="Salvar" disabled="@busy">@(busy ? "Salvando…" : "Adicionar lote")</button></div>
+        <FormMsg Texto="@msg" Ok="@msgOk" />
     </div>
 }
 @code {
-    List<LoteEstoqueDto> lotes = new(); List<BioinsumoDto> bios = new();
-    int bioId; string lote = "", un = "L", msg = ""; double qtd; double? temp; DateTime validade = DateTime.Today.AddMonths(6);
+    List<LoteEstoqueDto> lotes = new(); List<BioinsumoDto> bios = new(); Dictionary<string, string> erros = new();
+    int bioId; string lote = "", un = "L", msg = ""; bool msgOk, busy; double qtd; double? temp; DateTime validade = DateTime.Today.AddMonths(6);
+    MarkupString Err(string k) => erros.TryGetValue(k, out var m) ? new MarkupString($"<div class='field-err'>{m}</div>") : default;
+    string Inv(string k) => erros.ContainsKey(k) ? "invalid" : "";
     protected override async Task OnInitializedAsync()
     {
         try { bios = await Http.GetFromJsonAsync<List<BioinsumoDto>>("api/catalogo/bioinsumos") ?? new(); if (bios.Count > 0) bioId = bios[0].Id; await Carregar(); }
@@ -44,7 +54,20 @@ else
     async Task Carregar() { if (S.PropriedadeId > 0) lotes = await Http.GetFromJsonAsync<List<LoteEstoqueDto>>($"api/propriedades/{S.PropriedadeId}/estoque") ?? new(); }
     async Task Salvar()
     {
-        var r = await Http.PostAsJsonAsync($"api/propriedades/{S.PropriedadeId}/estoque", new LoteEstoqueRequest(bioId, lote, qtd, un, validade, temp));
-        msg = r.IsSuccessStatusCode ? "Lote adicionado." : "Erro ao salvar."; await Carregar();
+        erros.Clear();
+        if (Forms.Obrigatorio(lote, "o código do lote") is { } e1) erros["lote"] = e1;
+        if (qtd <= 0) erros["qtd"] = "A quantidade deve ser maior que zero.";
+        if (validade.Date < new DateTime(2000, 1, 1)) erros["val"] = "Informe uma validade válida.";
+        if (erros.Count > 0) { msgOk = false; msg = "Corrija os campos destacados."; return; }
+        busy = true;
+        try
+        {
+            var r = await Http.PostAsJsonAsync($"api/propriedades/{S.PropriedadeId}/estoque", new LoteEstoqueRequest(bioId, lote.Trim(), qtd, un, validade, temp));
+            msgOk = r.IsSuccessStatusCode;
+            msg = msgOk ? "Lote adicionado ao estoque." : await Forms.ErroAsync(r, "Não foi possível salvar o lote");
+            if (msgOk) { lote = ""; qtd = 0; temp = null; await Carregar(); }
+        }
+        catch (Exception ex) { msgOk = false; msg = "Falha de conexão: " + ex.Message; }
+        finally { busy = false; }
     }
 }

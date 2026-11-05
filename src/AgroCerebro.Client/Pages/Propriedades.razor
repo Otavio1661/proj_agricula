@@ -7,7 +7,7 @@
 @foreach (var x in S.Propriedades)
 {
     <div class="cardx">
-        <strong>@x.Nome</strong> @if (x.Id == S.PropriedadeId) { <span class="badge bg-success">ativa</span> }
+        <strong>@x.Nome</strong> @if (x.Id == S.PropriedadeId) { <span class="badge bg-success ms-2">ativa</span> }
         <div class="small text-muted">@x.Municipio/@x.Uf · @x.AreaHa.ToString("N1") ha · @x.Latitude.ToString("N4"), @x.Longitude.ToString("N4")</div>
         <div class="mt-2 d-flex gap-1 flex-wrap">
             <button class="btn btn-sm btn-outline-success" @onclick="() => S.SelecionarAsync(x.Id)">Usar</button>
@@ -20,56 +20,105 @@
 </div>
 <div class="cardx">
     <h2 class="h5">@(editId == 0 ? "Nova propriedade" : "Editar propriedade")</h2>
-    <div class="row g-2">
-        <div class="col-12 col-md-6"><input class="form-control" placeholder="Nome" @bind="nome" /></div>
-        <div class="col-8 col-md-4"><input class="form-control" placeholder="Município" @bind="mun" /></div>
-        <div class="col-4 col-md-2"><input class="form-control" placeholder="UF" maxlength="2" @bind="uf" /></div>
-        <div class="col-4"><input type="number" step="any" class="form-control" placeholder="Latitude" @bind="lat" /></div>
-        <div class="col-4"><input type="number" step="any" class="form-control" placeholder="Longitude" @bind="lon" /></div>
-        <div class="col-4"><input type="number" step="any" class="form-control" placeholder="Área (ha)" @bind="area" /></div>
+    <p class="hint">Campos com <span class="req"></span> são obrigatórios. As coordenadas definem de onde vem a previsão do tempo — use o botão de localização se estiver na fazenda.</p>
+    <div class="form-sec">Identificação</div>
+    <div class="row g-3">
+        <div class="col-12 col-md-6 field"><label class="req" for="p-nome">Nome da propriedade</label>
+            <input id="p-nome" class="form-control @Inv("nome")" placeholder="Ex.: Fazenda Santa Luzia" maxlength="150" @bind="nome" />@Err("nome")</div>
+        <div class="col-8 col-md-4 field"><label for="p-mun">Município</label>
+            <input id="p-mun" class="form-control" placeholder="Ex.: Umuarama" maxlength="100" @bind="mun" /></div>
+        <div class="col-4 col-md-2 field"><label for="p-uf">UF</label>
+            <input id="p-uf" class="form-control @Inv("uf")" placeholder="PR" maxlength="2" style="text-transform:uppercase" @bind="uf" />
+            <div class="hint">2 letras</div>@Err("uf")</div>
     </div>
-    <div class="mt-2 d-flex gap-2">
-        <button class="btn btn-primary" @onclick="Salvar">Salvar</button>
-        <button class="btn btn-outline-secondary" @onclick="GPS"><i class="fa-solid fa-location-dot"></i> Usar minha localização</button>
-        @if (editId != 0) { <button class="btn btn-link" @onclick="Limpar">Cancelar</button> }
+    <div class="form-sec">Localização e tamanho</div>
+    <div class="row g-3">
+        <div class="col-12 col-md-4 field"><label class="req" for="p-lat">Latitude (graus)</label>
+            <input id="p-lat" type="number" step="any" min="-90" max="90" class="form-control @Inv("lat")" @bind="lat" />
+            <div class="hint">Ex.: -23.7660 (sul é negativo)</div>@Err("lat")</div>
+        <div class="col-12 col-md-4 field"><label class="req" for="p-lon">Longitude (graus)</label>
+            <input id="p-lon" type="number" step="any" min="-180" max="180" class="form-control @Inv("lon")" @bind="lon" />
+            <div class="hint">Ex.: -53.3250 (oeste é negativo)</div>@Err("lon")</div>
+        <div class="col-12 col-md-4 field"><label class="req" for="p-area">Área total (hectares)</label>
+            <input id="p-area" type="number" step="any" min="0.01" class="form-control @Inv("area")" @bind="area" />
+            <div class="hint">1 hectare = 10.000 m²</div>@Err("area")</div>
     </div>
-    @if (msg != null) { <div class="small mt-2">@msg</div> }
+    <div class="form-actions">
+        <button class="btn btn-primary" @onclick="Salvar" disabled="@busy">@(busy ? "Salvando…" : "Salvar propriedade")</button>
+        <button class="btn btn-outline-secondary" @onclick="GPS" disabled="@busy"><i class="fa-solid fa-location-dot"></i> Usar minha localização</button>
+        @if (editId != 0) { <button class="btn btn-link" @onclick="Limpar">Cancelar edição</button> }
+    </div>
+    <FormMsg Texto="@msg" Ok="@msgOk" />
 </div>
 @if (membros != null)
 {
     <div class="cardx">
         <h2 class="h5">Equipe</h2>
         <ul>@foreach (var m in membros) { <li>@m.Nome (@m.Email) – @m.Papel</li> }</ul>
-        <div class="d-flex gap-2 flex-wrap">
-            <input class="form-control w-auto" placeholder="E-mail do usuário" @bind="convEmail" />
-            <select class="form-select w-auto" @bind="convPapel"><option>Agronomo</option><option>Operador</option></select>
-            <button class="btn btn-primary" @onclick="Convidar">Adicionar</button>
+        <div class="row g-3 align-items-end">
+            <div class="col-12 col-md-5 field"><label class="req" for="m-email">E-mail do usuário</label><input id="m-email" type="email" class="form-control" placeholder="pessoa@exemplo.com" @bind="convEmail" /><div class="hint">A pessoa precisa já ter criado conta.</div></div>
+            <div class="col-8 col-md-4 field"><label for="m-papel">Papel</label><select id="m-papel" class="form-select" @bind="convPapel"><option value="Agronomo">Agrônomo (edita)</option><option value="Operador">Operador (consulta e registra)</option></select></div>
+            <div class="col-4 col-md-3"><button class="btn btn-primary w-100" @onclick="Convidar" disabled="@busy">Adicionar</button></div>
         </div>
     </div>
 }
 @code {
-    int editId, membrosId; string nome = "", mun = "", uf = "", convEmail = "", convPapel = "Operador", msg;
-    double lat, lon, area; List<MembroDto>? membros;
+    int editId, membrosId; string nome = "", mun = "", uf = "", convEmail = "", convPapel = "Operador", msg = ""; bool msgOk, busy;
+    double lat, lon, area; List<MembroDto>? membros; Dictionary<string, string> erros = new();
     [Inject] IJSRuntime JS { get; set; } = default!;
-    void Editar(PropriedadeDto x) { editId = x.Id; nome = x.Nome; mun = x.Municipio ?? ""; uf = x.Uf ?? ""; lat = x.Latitude; lon = x.Longitude; area = x.AreaHa; }
-    void Limpar() { editId = 0; nome = mun = uf = ""; lat = lon = area = 0; }
+    MarkupString Err(string k) => erros.TryGetValue(k, out var m) ? new MarkupString($"<div class='field-err'>{m}</div>") : default;
+    string Inv(string k) => erros.ContainsKey(k) ? "invalid" : "";
+    void Editar(PropriedadeDto x) { editId = x.Id; nome = x.Nome; mun = x.Municipio ?? ""; uf = x.Uf ?? ""; lat = x.Latitude; lon = x.Longitude; area = x.AreaHa; erros.Clear(); msg = ""; }
+    void Limpar() { editId = 0; nome = mun = uf = ""; lat = lon = area = 0; erros.Clear(); }
+    bool Validar()
+    {
+        erros.Clear();
+        if (Forms.Obrigatorio(nome, "o nome da propriedade") is { } e1) erros["nome"] = e1;
+        if (!string.IsNullOrWhiteSpace(uf) && uf.Trim().Length != 2) erros["uf"] = "Use a sigla com 2 letras (ex.: PR).";
+        if (Forms.Faixa(lat, -90, 90, "A latitude") is { } e2) erros["lat"] = e2;
+        if (Forms.Faixa(lon, -180, 180, "A longitude") is { } e3) erros["lon"] = e3;
+        if (lat == 0 && lon == 0) { erros["lat"] = "Informe a latitude (ou use sua localização)."; erros["lon"] = "Informe a longitude."; }
+        if (area <= 0) erros["area"] = "A área deve ser maior que zero.";
+        return erros.Count == 0;
+    }
     async Task Salvar()
     {
-        var req = new PropriedadeSalvarRequest(nome, mun, uf, lat, lon, area);
-        var r = editId == 0 ? await Http.PostAsJsonAsync("api/propriedades", req) : await Http.PutAsJsonAsync($"api/propriedades/{editId}", req);
-        msg = r.IsSuccessStatusCode ? "Salvo!" : "Erro ao salvar.";
-        if (r.IsSuccessStatusCode) { Limpar(); await S.RecarregarPropriedadesAsync(); }
+        msg = ""; if (!Validar()) { msgOk = false; msg = "Corrija os campos destacados."; return; }
+        busy = true;
+        try
+        {
+            var req = new PropriedadeSalvarRequest(nome.Trim(), mun?.Trim(), uf?.Trim().ToUpperInvariant(), lat, lon, area);
+            var r = editId == 0 ? await Http.PostAsJsonAsync("api/propriedades", req) : await Http.PutAsJsonAsync($"api/propriedades/{editId}", req);
+            msgOk = r.IsSuccessStatusCode;
+            msg = msgOk ? "Propriedade salva com sucesso." : await Forms.ErroAsync(r, "Não foi possível salvar");
+            if (msgOk) { Limpar(); await S.RecarregarPropriedadesAsync(); }
+        }
+        catch (Exception ex) { msgOk = false; msg = "Falha de conexão: " + ex.Message; }
+        finally { busy = false; }
     }
     async Task GPS()
     {
-        try { var p = await JS.InvokeAsync<double[]>("agro.gps"); lat = p[0]; lon = p[1]; } catch { msg = "Localização indisponível."; }
+        try { var p = await JS.InvokeAsync<double[]>("agro.gps"); lat = p[0]; lon = p[1]; erros.Remove("lat"); erros.Remove("lon"); msgOk = true; msg = "Localização preenchida."; }
+        catch { msgOk = false; msg = "Localização indisponível. Permita o acesso ao GPS no navegador ou digite as coordenadas."; }
     }
-    async Task Excluir(int id) { await Http.DeleteAsync($"api/propriedades/{id}"); await S.RecarregarPropriedadesAsync(); }
+    async Task Excluir(int id)
+    {
+        var r = await Http.DeleteAsync($"api/propriedades/{id}");
+        msgOk = r.IsSuccessStatusCode; msg = msgOk ? "Propriedade excluída." : await Forms.ErroAsync(r, "Não foi possível excluir");
+        await S.RecarregarPropriedadesAsync();
+    }
     async Task Membros(int id) { membrosId = id; membros = await Http.GetFromJsonAsync<List<MembroDto>>($"api/propriedades/{id}/membros"); }
     async Task Convidar()
     {
-        var r = await Http.PostAsJsonAsync($"api/propriedades/{membrosId}/membros", new ConvidarMembroRequest(convEmail, convPapel));
-        msg = r.IsSuccessStatusCode ? "Membro adicionado." : "Usuário não encontrado ou sem permissão.";
-        await Membros(membrosId);
+        if (Forms.Obrigatorio(convEmail, "o e-mail") is { } e) { msgOk = false; msg = e; return; }
+        busy = true;
+        try
+        {
+            var r = await Http.PostAsJsonAsync($"api/propriedades/{membrosId}/membros", new ConvidarMembroRequest(convEmail.Trim(), convPapel));
+            msgOk = r.IsSuccessStatusCode; msg = msgOk ? "Membro adicionado." : await Forms.ErroAsync(r, "Não foi possível adicionar");
+            if (msgOk) convEmail = "";
+            await Membros(membrosId);
+        }
+        finally { busy = false; }
     }
 }

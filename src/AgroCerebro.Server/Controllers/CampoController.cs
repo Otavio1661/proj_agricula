@@ -144,19 +144,24 @@ public class CampoController(AppDbContext db, IAcessoService acesso, IWebHostEnv
     }
 
     [HttpPost("missoes/{id:int}/imagens"), RequestSizeLimit(200_000_000)]
-    public async Task<ActionResult<ImagemDroneDto>> UploadImagem(int id, [FromForm] IFormFile arquivo, [FromForm] string tipo, [FromForm] double sul, [FromForm] double oeste, [FromForm] double norte, [FromForm] double leste, [FromForm] double? gsdCm)
+    public async Task<ActionResult<ImagemDroneDto>> UploadImagem(int id, [FromForm] IFormFile arquivo, [FromForm] string tipo, [FromForm] string sul, [FromForm] string oeste, [FromForm] string norte, [FromForm] string leste, [FromForm] string? gsdCm)
     {
         var m = await db.MissoesDrone.Include(x => x.Talhao).FirstOrDefaultAsync(x => x.Id == id);
         if (m == null) return NotFound();
         if (!await acesso.PodeLerAsync(Uid, m.Talhao!.PropriedadeId)) return Forbid();
+        // Parse invariante: o cliente envia ponto decimal, independente da cultura do servidor (pt-BR usa vírgula).
+        static double D(string s) => double.Parse(s.Trim().Replace(",", "."), System.Globalization.CultureInfo.InvariantCulture);
+        if (!double.TryParse(sul?.Replace(",", "."), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _) || !double.TryParse(oeste?.Replace(",", "."), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _) || !double.TryParse(norte?.Replace(",", "."), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _) || !double.TryParse(leste?.Replace(",", "."), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _)) return BadRequest("Limites inválidos.");
+        double sulD = D(sul), oesteD = D(oeste), norteD = D(norte), lesteD = D(leste);
+        double? gsd = string.IsNullOrWhiteSpace(gsdCm) ? null : D(gsdCm);
         var ext = Path.GetExtension(arquivo.FileName).ToLowerInvariant();
         if (ext is not (".jpg" or ".jpeg" or ".png" or ".webp")) return BadRequest("Envie JPG, PNG ou WEBP (exporte o ortomosaico do WebODM/Pix4D em PNG/JPG + limites).");
-        if (norte <= sul || leste <= oeste) return BadRequest("Limites inválidos (norte>sul, leste>oeste).");
+        if (norteD <= sulD || lesteD <= oesteD) return BadRequest("Limites inválidos (norte>sul, leste>oeste).");
         var dir = Path.Combine(env.WebRootPath ?? Path.Combine(env.ContentRootPath, "wwwroot"), "uploads");
         Directory.CreateDirectory(dir);
         var nome = $"{Guid.NewGuid():N}{ext}";
         await using (var fs = System.IO.File.Create(Path.Combine(dir, nome))) await arquivo.CopyToAsync(fs);
-        var img = new ImagemDrone { MissaoId = id, Arquivo = nome, Tipo = string.IsNullOrWhiteSpace(tipo) ? "RGB" : tipo, Sul = sul, Oeste = oeste, Norte = norte, Leste = leste, GsdCm = gsdCm };
+        var img = new ImagemDrone { MissaoId = id, Arquivo = nome, Tipo = string.IsNullOrWhiteSpace(tipo) ? "RGB" : tipo, Sul = sulD, Oeste = oesteD, Norte = norteD, Leste = lesteD, GsdCm = gsd };
         db.ImagensDrone.Add(img);
         await db.SaveChangesAsync();
         return Map(img);

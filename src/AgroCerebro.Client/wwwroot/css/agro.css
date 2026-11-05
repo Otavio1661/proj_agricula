@@ -33,3 +33,18 @@ a, .btn-link { color: var(--verde); }
   .tabbar a span { display:block; font-size:1.25rem; }
   .tabbar a.active { color:var(--verde); font-weight:700; }
 }
+
+/* ===== Formulários ===== */
+.field label, label.lbl { display:block; font-weight:600; font-size:.85rem; margin-bottom:.2rem; color:#2b3a2a; }
+.req::after { content:" *"; color:#c62828; }
+.hint { font-size:.75rem; color:#6b7a69; margin-top:.15rem; }
+.form-control, .form-select { border-color:#b9c7b4; }
+.form-control:focus, .form-select:focus { border-color:var(--verde); box-shadow:0 0 0 .2rem rgba(46,125,50,.2); }
+.field-err { color:#c62828; font-size:.78rem; margin-top:.15rem; }
+.form-control.invalid, .form-select.invalid { border-color:#c62828; }
+.msg { padding:.5rem .75rem; border-radius:8px; margin-top:.75rem; font-size:.9rem; }
+.msg-ok { background:#e8f5e9; color:#1b5e20; border:1px solid #a5d6a7; }
+.msg-err { background:#fdecea; color:#b71c1c; border:1px solid #f5c2c0; }
+.form-actions { display:flex; gap:.5rem; flex-wrap:wrap; margin-top:1rem; align-items:center; }
+.form-sec { font-size:.8rem; text-transform:uppercase; letter-spacing:.04em; color:var(--terra); font-weight:700; margin:.9rem 0 .3rem; }
+@media (max-width:768px) { .form-actions .btn { flex:1 1 100%; } .form-control, .form-select { font-size:16px; } }

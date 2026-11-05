@@ -7,8 +7,8 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-builder.Services.AddScoped<Session>();
-builder.Services.AddScoped<AuthHandler>();
+builder.Services.AddSingleton<Session>(); // singleton: o AuthHandler (escopo do HttpClientFactory) precisa enxergar o MESMO token
+builder.Services.AddTransient<AuthHandler>();
 builder.Services.AddHttpClient("api", c => c.BaseAddress = new Uri(builder.HostEnvironment.BaseAddress))
     .AddHttpMessageHandler<AuthHandler>();
 builder.Services.AddScoped(sp => sp.GetRequiredService<IHttpClientFactory>().CreateClient("api"));

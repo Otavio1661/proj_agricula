@@ -7,25 +7,35 @@
     <h1 class="h3"><i class="fa-solid fa-seedling"></i> AgroCérebro</h1>
     <p class="text-muted">O cérebro do produtor no campo.</p>
     <EditForm Model="this" OnSubmit="Enviar">
-        @if (registro) { <div class="mb-2"><label>Nome</label><input class="form-control" @bind="nome" /></div> }
-        <div class="mb-2"><label>Usuário / e-mail</label><input type="text" autocomplete="username" class="form-control" placeholder="admin ou seu e-mail" @bind="email" /></div>
-        <div class="mb-2"><label>Senha</label><input type="password" class="form-control" @bind="senha" /></div>
-        @if (erro != null) { <div class="alert alert-danger py-1">@erro</div> }
-        <button class="btn btn-primary w-100" disabled="@busy">@(registro ? "Criar conta" : "Entrar")</button>
+        <h2 class="h5">@(registro ? "Criar conta" : "Entrar")</h2>
+        @if (registro) { <div class="mb-3 field"><label class="req" for="l-nome">Seu nome</label><input id="l-nome" class="form-control" autocomplete="name" placeholder="Ex.: Maria Silva" @bind="nome" /></div> }
+        <div class="mb-3 field"><label class="req" for="l-user">@(registro ? "E-mail" : "Usuário ou e-mail")</label>
+            <input id="l-user" type="@(registro ? "email" : "text")" autocomplete="username" class="form-control" placeholder="@(registro ? "voce@exemplo.com" : "admin ou voce@exemplo.com")" @bind="email" /></div>
+        <div class="mb-3 field"><label class="req" for="l-senha">Senha</label>
+            <input id="l-senha" type="password" autocomplete="@(registro ? "new-password" : "current-password")" class="form-control" @bind="senha" />
+            @if (registro) { <div class="hint">Mínimo de 6 caracteres.</div> }</div>
+        <FormMsg Texto="@erro" Ok="false" />
+        <button class="btn btn-primary w-100 mt-2" disabled="@busy">@(busy ? "Aguarde…" : registro ? "Criar conta" : "Entrar")</button>
     </EditForm>
-    <button class="btn btn-link w-100 mt-2" @onclick="() => registro = !registro">@(registro ? "Já tenho conta" : "Criar nova conta")</button>
+    <button class="btn btn-link w-100 mt-2" @onclick="() => { registro = !registro; erro = null; }">@(registro ? "Já tenho conta" : "Criar nova conta")</button>
 </div>
 @code {
     bool registro, busy; string nome = "", email = "", senha = ""; string? erro;
     protected override async Task OnInitializedAsync() { await S.CarregarAsync(); if (S.Autenticado) Nav.NavigateTo("/"); }
     async Task Enviar()
     {
-        busy = true; erro = null;
+        erro = null;
+        if (registro && string.IsNullOrWhiteSpace(nome)) { erro = "Informe seu nome."; return; }
+        if (string.IsNullOrWhiteSpace(email)) { erro = registro ? "Informe seu e-mail." : "Informe o usuário ou e-mail."; return; }
+        if (registro && !email.Contains('@')) { erro = "Informe um e-mail válido."; return; }
+        if (string.IsNullOrEmpty(senha)) { erro = "Informe a senha."; return; }
+        if (registro && senha.Length < 6) { erro = "A senha deve ter pelo menos 6 caracteres."; return; }
+        busy = true;
         try
         {
-            var r = registro ? await Http.PostAsJsonAsync("api/auth/registrar", new RegistroRequest(nome, email, senha))
-                             : await Http.PostAsJsonAsync("api/auth/login", new LoginRequest(email, senha));
-            if (!r.IsSuccessStatusCode) { erro = registro ? "Não foi possível cadastrar (e-mail já usado?)." : "E-mail ou senha inválidos."; return; }
+            var r = registro ? await Http.PostAsJsonAsync("api/auth/registrar", new RegistroRequest(nome.Trim(), email.Trim(), senha))
+                             : await Http.PostAsJsonAsync("api/auth/login", new LoginRequest(email.Trim(), senha));
+            if (!r.IsSuccessStatusCode) { erro = await Forms.ErroAsync(r, registro ? "Não foi possível cadastrar" : "Usuário ou senha inválidos"); return; }
             await S.EntrarAsync((await r.Content.ReadFromJsonAsync<AuthResponse>())!);
             Nav.NavigateTo("/");
         }

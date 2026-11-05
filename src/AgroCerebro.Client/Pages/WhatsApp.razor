@@ -20,17 +20,23 @@
     }
     <div class="cardx">
         <h2 class="h5">Adicionar número</h2>
-        <div class="row g-2">
-            <div class="col-12 col-md-5"><input class="form-control" placeholder="Nome" @bind="nome" disabled="@Cheio" /></div>
-            <div class="col-8 col-md-5"><input class="form-control" placeholder="5511999998888" inputmode="numeric" @bind="numero" disabled="@Cheio" /></div>
-            <div class="col-4 col-md-2"><button class="btn btn-primary w-100" @onclick="Adicionar" disabled="@Cheio">Adicionar</button></div>
+        <div class="row g-3 align-items-start">
+            <div class="col-12 col-md-5 field"><label class="req" for="w-nome">Nome do contato</label>
+                <input id="w-nome" class="form-control @(erroNome != null ? "invalid" : "")" placeholder="Ex.: João (gerente)" maxlength="80" @bind="nome" disabled="@Cheio" />
+                @if (erroNome != null) { <div class="field-err">@erroNome</div> }</div>
+            <div class="col-12 col-md-5 field"><label class="req" for="w-num">WhatsApp (com DDI e DDD)</label>
+                <input id="w-num" type="tel" class="form-control @(erroNum != null ? "invalid" : "")" placeholder="5511999998888" inputmode="numeric" maxlength="20" @bind="numero" disabled="@Cheio" />
+                <div class="hint">Só números: 55 + DDD + número. Ex.: 5544999998888</div>
+                @if (erroNum != null) { <div class="field-err">@erroNum</div> }</div>
+            <div class="col-12 col-md-2 field"><label class="d-none d-md-block">&nbsp;</label>
+                <button class="btn btn-primary w-100" @onclick="Adicionar" disabled="@(Cheio || busy)">@(busy ? "Salvando…" : "Adicionar")</button></div>
         </div>
-        @if (Cheio) { <div class="small text-muted mt-1">Limite de @st.Limite números atingido.</div> }
+        @if (Cheio) { <div class="hint mt-1">Limite de @st.Limite números atingido. Remova um para cadastrar outro.</div> }
     </div>
 }
-@if (msg != null) { <div class="small">@msg</div> }
+<FormMsg Texto="@msg" Ok="@msgOk" />
 @code {
-    WhatsAppStatusDto? st; string nome = "", numero = "", msg, erro;
+    WhatsAppStatusDto? st; string nome = "", numero = "", msg = "", erro, erroNome, erroNum; bool msgOk, busy;
     bool Cheio => st != null && st.Numeros.Count >= st.Limite;
     protected override async Task OnInitializedAsync() => await Carregar();
     async Task Carregar()
@@ -40,15 +46,25 @@
     }
     async Task Adicionar()
     {
-        var r = await Http.PostAsJsonAsync("api/whatsapp/numeros", new ContatoWhatsAppRequest(nome, numero));
-        msg = r.IsSuccessStatusCode ? "Número adicionado." : "Não foi possível adicionar (número inválido ou limite atingido).";
-        if (r.IsSuccessStatusCode) { nome = numero = ""; }
-        await Carregar();
+        erroNome = Forms.Obrigatorio(nome, "o nome do contato");
+        var dig = new string((numero ?? "").Where(char.IsDigit).ToArray());
+        erroNum = dig.Length < 10 ? "Número muito curto. Use DDI + DDD + número (ex.: 5544999998888)." : dig.Length > 15 ? "Número muito longo." : null;
+        if (erroNome != null || erroNum != null) { msgOk = false; msg = "Corrija os campos destacados."; return; }
+        busy = true;
+        try
+        {
+            var r = await Http.PostAsJsonAsync("api/whatsapp/numeros", new ContatoWhatsAppRequest(nome.Trim(), dig));
+            msgOk = r.IsSuccessStatusCode;
+            msg = msgOk ? "Número adicionado. Use \"Enviar teste\" para confirmar." : await Forms.ErroAsync(r, "Não foi possível adicionar");
+            if (msgOk) nome = numero = "";
+            await Carregar();
+        }
+        finally { busy = false; }
     }
     async Task Remover(int id) { await Http.DeleteAsync($"api/whatsapp/numeros/{id}"); await Carregar(); }
     async Task Testar(int id)
     {
         var r = await Http.PostAsync($"api/whatsapp/numeros/{id}/testar", null);
-        msg = r.IsSuccessStatusCode ? "Mensagem de teste enviada." : "Falha ao enviar o teste.";
+        msgOk = r.IsSuccessStatusCode; msg = msgOk ? "Mensagem de teste enviada. Confira o WhatsApp." : await Forms.ErroAsync(r, "Falha ao enviar o teste");
     }
 }

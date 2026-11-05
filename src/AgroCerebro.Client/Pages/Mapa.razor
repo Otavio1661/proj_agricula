@@ -18,9 +18,13 @@
 @if (novo != null)
 {
     <div class="cardx">
-        <strong>Novo talhão</strong> – área calculada: @novo.Value.areaHa.ToString("N2") ha
-        <div class="d-flex gap-2 mt-2"><input class="form-control" placeholder="Nome do talhão" @bind="nome" />
-            <button class="btn btn-primary" @onclick="SalvarNovo">Salvar</button></div>
+        <h2 class="h5">Novo talhão</h2>
+        <p class="hint">Área calculada pelo desenho: <strong>@novo.Value.areaHa.ToString("N2") ha</strong></p>
+        <div class="field"><label class="req" for="m-nome">Nome do talhão</label>
+            <input id="m-nome" class="form-control @(erroNome != null ? "invalid" : "")" maxlength="120" placeholder="Ex.: Talhão 1 – Milho" @bind="nome" />
+            @if (erroNome != null) { <div class="field-err">@erroNome</div> }</div>
+        <div class="form-actions"><button class="btn btn-primary" @onclick="SalvarNovo" disabled="@busy">@(busy ? "Salvando…" : "Salvar talhão")</button>
+            <button class="btn btn-link" @onclick="() => novo = null">Descartar</button></div>
     </div>
 }
 <div id="mapa" class="mapa"></div>
@@ -38,10 +42,10 @@
         }
     </div>
 }
-@if (msg != null) { <div class="small">@msg</div> }
+<FormMsg Texto="@msg" Ok="@msgOk" />
 @code {
     List<TalhaoDto> talhoes = new(); List<ImagemDroneDto> imagens = new();
-    bool desenhando; (string geoJson, double areaHa)? novo; string nome = "", msg;
+    bool desenhando; (string geoJson, double areaHa)? novo; string nome = "", msg = "", erroNome; bool msgOk, busy;
 
     class Res { public string geoJson { get; set; } = ""; public double areaHa { get; set; } }
 
@@ -76,13 +80,23 @@
     {
         desenhando = false;
         var r = await JS.InvokeAsync<Res?>("mapa.finishDraw");
-        if (r == null) { msg = "Marque ao menos 3 pontos."; return; }
+        if (r == null) { msgOk = false; msg = "Marque ao menos 3 pontos no mapa para formar o talhão."; return; }
         novo = (r.geoJson, r.areaHa); nome = $"Talhão {talhoes.Count + 1}";
     }
     async Task SalvarNovo()
     {
-        var r = await Http.PostAsJsonAsync($"api/propriedades/{S.PropriedadeId}/talhoes", new TalhaoSalvarRequest(nome, novo!.Value.areaHa, novo.Value.geoJson, null));
-        msg = r.IsSuccessStatusCode ? "Talhão salvo." : "Erro ao salvar."; novo = null; await Recarregar();
+        erroNome = Forms.Obrigatorio(nome, "o nome do talhão");
+        if (erroNome != null) return;
+        busy = true;
+        try
+        {
+            var r = await Http.PostAsJsonAsync($"api/propriedades/{S.PropriedadeId}/talhoes", new TalhaoSalvarRequest(nome.Trim(), novo!.Value.areaHa, novo.Value.geoJson, null));
+            msgOk = r.IsSuccessStatusCode;
+            msg = msgOk ? "Talhão salvo." : await Forms.ErroAsync(r, "Não foi possível salvar o talhão");
+            if (msgOk) { novo = null; await Recarregar(); }
+        }
+        catch (Exception ex) { msgOk = false; msg = "Falha de conexão: " + ex.Message; }
+        finally { busy = false; }
     }
     async Task Opac(int id, ChangeEventArgs e) => await JS.InvokeVoidAsync("mapa.setOpacity", id, double.Parse(e.Value!.ToString()!, System.Globalization.CultureInfo.InvariantCulture));
     async Task Vari(int id, ChangeEventArgs e) => await JS.InvokeVoidAsync("mapa.setVari", id, (bool)e.Value!);

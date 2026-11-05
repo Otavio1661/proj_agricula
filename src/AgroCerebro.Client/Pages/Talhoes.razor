@@ -32,27 +32,35 @@ else
     {
         <div class="cardx">
             <h2 class="h5">Plantio / estágio – @sel.Nome</h2>
-            <div class="row g-2">
-                <div class="col-12 col-md-4"><label>Cultura</label>
-                    <select class="form-select" @bind="culturaId">@foreach (var c in culturas) { <option value="@c.Id">@c.Nome</option> }</select></div>
-                <div class="col-12 col-md-4"><label>Data do plantio</label><input type="date" class="form-control" @bind="dataPlantio" /></div>
-                <div class="col-12 col-md-4"><label>BBCH: <strong>@bbch</strong> – @Bbch.Estagio(bbch)</label>
-                    <input type="range" min="0" max="99" class="form-range" @bind="bbch" @bind:event="oninput" /></div>
+            <div class="row g-3">
+                <div class="col-12 col-md-4 field"><label class="req" for="t-cult">Cultura</label>
+                    <select id="t-cult" class="form-select" @bind="culturaId">@foreach (var c in culturas) { <option value="@c.Id">@c.Nome</option> }</select></div>
+                <div class="col-12 col-md-4 field"><label class="req" for="t-data">Data do plantio</label><input id="t-data" type="date" class="form-control @Inv("data")" @bind="dataPlantio" />@Err("data")</div>
+                <div class="col-12 col-md-4 field"><label for="t-bbch">Estágio BBCH: <strong>@bbch</strong> – @Bbch.Estagio(bbch)</label>
+                    <input id="t-bbch" type="range" min="0" max="99" class="form-range" @bind="bbch" @bind:event="oninput" />
+                    <div class="hint">0 = semente/germinação · 99 = colheita/pós-colheita</div></div>
             </div>
-            <button class="btn btn-primary mt-2" @onclick="SalvarPlantio">Salvar plantio</button>
-            @if (sel.PlantioAtivo != null) { <button class="btn btn-outline-success mt-2" @onclick="Monitorar">Registrar monitoramento (BBCH @bbch)</button> }
+            <div class="form-actions">
+                <button class="btn btn-primary" @onclick="SalvarPlantio" disabled="@busy">@(busy ? "Salvando…" : "Salvar plantio")</button>
+                @if (sel.PlantioAtivo != null) { <button class="btn btn-outline-success" @onclick="Monitorar" disabled="@busy">Registrar monitoramento (BBCH @bbch)</button> }
+            </div>
+            <FormMsg Texto="@msg" Ok="@msgOk" />
         </div>
     }
     @if (sel != null && modo == 'o')
     {
         <div class="cardx">
             <h2 class="h5">Ocorrência de praga – @sel.Nome</h2>
-            <div class="row g-2">
-                <div class="col-12 col-md-5"><select class="form-select" @bind="pragaId">@foreach (var g in pragas) { <option value="@g.Id">@g.Nome (@g.Tipo)</option> }</select></div>
-                <div class="col-12 col-md-4"><label>Severidade: @sev/5</label><input type="range" min="0" max="5" class="form-range" @bind="sev" @bind:event="oninput" /></div>
-                <div class="col-12 col-md-3"><input class="form-control" placeholder="Notas" @bind="notas" /></div>
+            <div class="row g-3">
+                <div class="col-12 col-md-5 field"><label class="req" for="o-praga">Praga ou doença observada</label>
+                    <select id="o-praga" class="form-select" @bind="pragaId">@foreach (var g in pragas) { <option value="@g.Id">@g.Nome (@g.Tipo)</option> }</select></div>
+                <div class="col-12 col-md-4 field"><label for="o-sev">Severidade: <strong>@sev</strong> de 5</label>
+                    <input id="o-sev" type="range" min="0" max="5" class="form-range" @bind="sev" @bind:event="oninput" />
+                    <div class="hint">0 = ausente · 3 = moderada · 5 = infestação severa</div></div>
+                <div class="col-12 col-md-3 field"><label for="o-notas">Observações</label><input id="o-notas" class="form-control" placeholder="Ex.: borda do talhão" maxlength="500" @bind="notas" /><div class="hint">Opcional</div></div>
             </div>
-            <button class="btn btn-primary mt-2" @onclick="SalvarOcorrencia">Registrar</button>
+            <div class="form-actions"><button class="btn btn-primary" @onclick="SalvarOcorrencia" disabled="@busy">@(busy ? "Salvando…" : "Registrar ocorrência")</button></div>
+            <FormMsg Texto="@msg" Ok="@msgOk" />
             <ul class="mt-2">@foreach (var o in ocorrencias) { <li>@o.Data.ToLocalTime().ToString("dd/MM") – @o.PragaNome (sev @o.Severidade) @o.Notas</li> }</ul>
         </div>
     }
@@ -60,21 +68,30 @@ else
     {
         <div class="cardx">
             <h2 class="h5">@(modo == 'e' ? "Editar talhão" : "Novo talhão")</h2>
-            <div class="row g-2">
-                <div class="col-12 col-md-5"><input class="form-control" placeholder="Nome" @bind="nome" /></div>
-                <div class="col-6 col-md-3"><input type="number" step="any" class="form-control" placeholder="Área (ha)" @bind="area" /></div>
-                <div class="col-6 col-md-4"><select class="form-select" @bind="soloId"><option value="0">Solo…</option>@foreach (var s in solos) { <option value="@s.Id">@s.Nome</option> }</select></div>
+            <p class="hint">Campos com <span class="req"></span> são obrigatórios. Dica: desenhando no mapa a área é calculada sozinha.</p>
+            <div class="row g-3">
+                <div class="col-12 col-md-5 field"><label class="req" for="t-nome">Nome do talhão</label>
+                    <input id="t-nome" class="form-control @Inv("nome")" placeholder="Ex.: Talhão 3 – Soja" maxlength="120" @bind="nome" />@Err("nome")</div>
+                <div class="col-6 col-md-3 field"><label class="req" for="t-area">Área (hectares)</label>
+                    <input id="t-area" type="number" step="any" min="0.01" class="form-control @Inv("area")" @bind="area" />@Err("area")</div>
+                <div class="col-6 col-md-4 field"><label for="t-solo">Tipo de solo</label>
+                    <select id="t-solo" class="form-select" @bind="soloId"><option value="0">Não informado</option>@foreach (var s in solos) { <option value="@s.Id">@s.Nome (@s.Textura)</option> }</select></div>
             </div>
-            <button class="btn btn-primary mt-2" @onclick="SalvarTalhao">Salvar</button>
+            <div class="form-actions"><button class="btn btn-primary" @onclick="SalvarTalhao" disabled="@busy">@(busy ? "Salvando…" : "Salvar talhão")</button>
+                <button class="btn btn-link" @onclick="() => modo = ' '">Cancelar</button></div>
+            <FormMsg Texto="@msg" Ok="@msgOk" />
         </div>
     }
     else { <button class="btn btn-primary" @onclick="Novo">+ Novo talhão</button> }
-    @if (msg != null) { <div class="small mt-2">@msg</div> }
+    @if (modo != 'n' && modo != 'e' && modo != 'p' && modo != 'o') { <FormMsg Texto="@msg" Ok="@msgOk" /> }
 }
 @code {
     List<TalhaoDto> talhoes = new(); List<CulturaDto> culturas = new(); List<PragaDto> pragas = new(); List<TipoSoloDto> solos = new(); List<OcorrenciaPragaDto> ocorrencias = new();
-    TalhaoDto? sel; char modo = ' '; string nome = "", notas = "", msg; double area; int soloId, culturaId, pragaId, bbch = 10, sev = 1; DateTime dataPlantio = DateTime.Today;
+    TalhaoDto? sel; char modo = ' '; string nome = "", notas = "", msg = ""; double area; int soloId, culturaId, pragaId, bbch = 10, sev = 1; DateTime dataPlantio = DateTime.Today;
 
+    Dictionary<string, string> erros = new(); bool msgOk, busy;
+    MarkupString Err(string k) => erros.TryGetValue(k, out var m) ? new MarkupString($"<div class='field-err'>{m}</div>") : default;
+    string Inv(string k) => erros.ContainsKey(k) ? "invalid" : "";
     protected override async Task OnInitializedAsync()
     {
         try
@@ -96,28 +113,40 @@ else
         if (m == 'e') { nome = t.Nome; area = t.AreaHa; soloId = t.TipoSoloId ?? 0; }
         if (m == 'o') ocorrencias = await Http.GetFromJsonAsync<List<OcorrenciaPragaDto>>($"api/talhoes/{t.Id}/ocorrencias") ?? new();
     }
-    void Novo() { sel = null; modo = 'n'; nome = ""; area = 0; soloId = 0; }
+    void Novo() { sel = null; modo = 'n'; nome = ""; area = 0; soloId = 0; erros.Clear(); msg = ""; }
+    async Task<bool> Envia(Func<Task<HttpResponseMessage>> f, string ok, string falha)
+    {
+        busy = true;
+        try { var r = await f(); msgOk = r.IsSuccessStatusCode; msg = msgOk ? ok : await Forms.ErroAsync(r, falha); return msgOk; }
+        catch (Exception ex) { msgOk = false; msg = "Falha de conexão: " + ex.Message; return false; }
+        finally { busy = false; }
+    }
     async Task SalvarTalhao()
     {
-        var req = new TalhaoSalvarRequest(nome, area, sel?.GeoJson, soloId == 0 ? null : soloId);
-        var r = modo == 'e' ? await Http.PutAsJsonAsync($"api/talhoes/{sel!.Id}", req) : await Http.PostAsJsonAsync($"api/propriedades/{S.PropriedadeId}/talhoes", req);
-        msg = r.IsSuccessStatusCode ? "Talhão salvo." : "Erro ao salvar."; modo = ' '; await Carregar();
+        erros.Clear();
+        if (Forms.Obrigatorio(nome, "o nome do talhão") is { } e1) erros["nome"] = e1;
+        if (area <= 0) erros["area"] = "A área deve ser maior que zero.";
+        if (erros.Count > 0) { msgOk = false; msg = "Corrija os campos destacados."; return; }
+        var req = new TalhaoSalvarRequest(nome.Trim(), area, sel?.GeoJson, soloId == 0 ? null : soloId);
+        if (await Envia(() => modo == 'e' ? Http.PutAsJsonAsync($"api/talhoes/{sel!.Id}", req) : Http.PostAsJsonAsync($"api/propriedades/{S.PropriedadeId}/talhoes", req), "Talhão salvo.", "Não foi possível salvar o talhão")) { modo = ' '; await Carregar(); }
     }
     async Task SalvarPlantio()
     {
-        var r = await Http.PostAsJsonAsync($"api/talhoes/{sel!.Id}/plantio", new PlantioSalvarRequest(culturaId, dataPlantio, bbch));
-        msg = r.IsSuccessStatusCode ? "Plantio salvo." : "Erro ao salvar plantio."; modo = ' '; await Carregar();
+        erros.Clear();
+        if (dataPlantio.Year < 2000 || dataPlantio > DateTime.Today.AddYears(1)) { erros["data"] = "Informe uma data de plantio válida."; msgOk = false; msg = "Corrija os campos destacados."; return; }
+        if (await Envia(() => Http.PostAsJsonAsync($"api/talhoes/{sel!.Id}/plantio", new PlantioSalvarRequest(culturaId, dataPlantio, bbch)), "Plantio salvo.", "Não foi possível salvar o plantio")) { modo = ' '; await Carregar(); }
     }
     async Task Monitorar()
     {
-        var r = await Http.PostAsJsonAsync("api/monitoramentos", new MonitoramentoRequest(sel!.PlantioAtivo!.Id, bbch, null));
-        msg = r.IsSuccessStatusCode ? "Monitoramento registrado." : "Erro."; modo = ' '; await Carregar();
+        if (await Envia(() => Http.PostAsJsonAsync("api/monitoramentos", new MonitoramentoRequest(sel!.PlantioAtivo!.Id, bbch, null)), "Monitoramento registrado.", "Não foi possível registrar")) { modo = ' '; await Carregar(); }
     }
     async Task SalvarOcorrencia()
     {
-        var r = await Http.PostAsJsonAsync("api/ocorrencias", new OcorrenciaPragaRequest(sel!.Id, pragaId, sev, null, null, notas));
-        msg = r.IsSuccessStatusCode ? "Ocorrência registrada." : "Erro."; notas = "";
-        ocorrencias = await Http.GetFromJsonAsync<List<OcorrenciaPragaDto>>($"api/talhoes/{sel.Id}/ocorrencias") ?? new();
+        if (await Envia(() => Http.PostAsJsonAsync("api/ocorrencias", new OcorrenciaPragaRequest(sel!.Id, pragaId, sev, null, null, notas)), "Ocorrência registrada.", "Não foi possível registrar"))
+        {
+            notas = "";
+            ocorrencias = await Http.GetFromJsonAsync<List<OcorrenciaPragaDto>>($"api/talhoes/{sel!.Id}/ocorrencias") ?? new();
+        }
     }
     async Task Excluir(int id) { await Http.DeleteAsync($"api/talhoes/{id}"); await Carregar(); }
 }
