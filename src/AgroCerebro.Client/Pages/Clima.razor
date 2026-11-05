@@ -6,11 +6,11 @@
 @if (erro != null) { <div class="alert alert-warning">@erro</div> }
 @if (c != null)
 {
-    <p>Agora: <strong>@c.TemperaturaAtualC.ToString("N1") °C</strong> · 💧 @c.UmidadeAtualPct.ToString("N0")% · 💨 @c.VentoAtualKmh.ToString("N0") km/h <span class="small text-muted">(fonte: @c.Fonte)</span></p>
-    @Chart("🌡️ Temperatura (°C)", c.Horas.Select(h => h.TemperaturaC), 0, 45, "#e65100")
-    @Chart("💧 Umidade relativa (%)", c.Horas.Select(h => h.UmidadePct), 0, 100, "#0277bd")
-    @Chart("🌧️ Chuva (mm/h)", c.Horas.Select(h => h.ChuvaMm), 0, Math.Max(2, c.Horas.Max(h => h.ChuvaMm)), "#1a237e")
-    @Chart("💨 Vento (km/h)", c.Horas.Select(h => h.VentoKmh), 0, Math.Max(20, c.Horas.Max(h => h.VentoKmh)), "#6d4c41")
+    <p>Agora: <strong>@c.TemperaturaAtualC.ToString("N1") °C</strong> · <i class="fa-solid fa-droplet"></i> @c.UmidadeAtualPct.ToString("N0")% · <i class="fa-solid fa-wind"></i> @c.VentoAtualKmh.ToString("N0") km/h <span class="small text-muted">(fonte: @c.Fonte)</span></p>
+    @Chart("<i class='fa-solid fa-temperature-half'></i> Temperatura (°C)", c.Horas.Select(h => h.TemperaturaC), 0, 45, "#e65100")
+    @Chart("<i class='fa-solid fa-droplet'></i> Umidade relativa (%)", c.Horas.Select(h => h.UmidadePct), 0, 100, "#0277bd")
+    @Chart("<i class='fa-solid fa-cloud-rain'></i> Chuva (mm/h)", c.Horas.Select(h => h.ChuvaMm), 0, Math.Max(2, c.Horas.Max(h => h.ChuvaMm)), "#1a237e")
+    @Chart("<i class='fa-solid fa-wind'></i> Vento (km/h)", c.Horas.Select(h => h.VentoKmh), 0, Math.Max(20, c.Horas.Max(h => h.VentoKmh)), "#6d4c41")
 }
 @code {
     ClimaDto? c; string? erro;

@@ -30,7 +30,7 @@
     </div>
     <div class="mt-2 d-flex gap-2">
         <button class="btn btn-primary" @onclick="Salvar">Salvar</button>
-        <button class="btn btn-outline-secondary" @onclick="GPS">📍 Usar minha localização</button>
+        <button class="btn btn-outline-secondary" @onclick="GPS"><i class="fa-solid fa-location-dot"></i> Usar minha localização</button>
         @if (editId != 0) { <button class="btn btn-link" @onclick="Limpar">Cancelar</button> }
     </div>
     @if (msg != null) { <div class="small mt-2">@msg</div> }

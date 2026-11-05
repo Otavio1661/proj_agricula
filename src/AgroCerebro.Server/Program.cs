@@ -46,7 +46,9 @@ var app = builder.Build();
 if (builder.Configuration.GetValue("Database:MigrateOnStartup", true))
 {
     using var scope = app.Services.CreateScope();
-    scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate();
+    var ctx = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    ctx.Database.Migrate();
+    await DbSeeder.SeedAdminAsync(ctx, builder.Configuration);
 }
 
 if (app.Environment.IsDevelopment())

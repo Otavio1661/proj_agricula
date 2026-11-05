@@ -2,7 +2,7 @@
 @inject HttpClient Http
 @inject Session S
 <PageTitle>Alertas</PageTitle>
-<h1 class="h3">🔔 Alertas</h1>
+<h1 class="h3"><i class="fa-solid fa-bell"></i> Alertas</h1>
 <button class="btn btn-sm btn-primary mb-2" @onclick="Gerar" disabled="@(S.PropriedadeId == 0)">Avaliar agora</button> <span class="small">@msg</span>
 @if (erro != null) { <div class="alert alert-warning">@erro</div> }
 @if (lista.Count == 0 && erro == null) { <p class="text-muted">Sem alertas.</p> }

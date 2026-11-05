@@ -4,11 +4,11 @@
 @inject NavigationManager Nav
 <PageTitle>Entrar – AgroCérebro</PageTitle>
 <div class="auth-box cardx">
-    <h1 class="h3">🌱 AgroCérebro</h1>
+    <h1 class="h3"><i class="fa-solid fa-seedling"></i> AgroCérebro</h1>
     <p class="text-muted">O cérebro do produtor no campo.</p>
     <EditForm Model="this" OnSubmit="Enviar">
         @if (registro) { <div class="mb-2"><label>Nome</label><input class="form-control" @bind="nome" /></div> }
-        <div class="mb-2"><label>E-mail</label><input type="email" class="form-control" @bind="email" /></div>
+        <div class="mb-2"><label>Usuário / e-mail</label><input type="text" autocomplete="username" class="form-control" placeholder="admin ou seu e-mail" @bind="email" /></div>
         <div class="mb-2"><label>Senha</label><input type="password" class="form-control" @bind="senha" /></div>
         @if (erro != null) { <div class="alert alert-danger py-1">@erro</div> }
         <button class="btn btn-primary w-100" disabled="@busy">@(registro ? "Criar conta" : "Entrar")</button>

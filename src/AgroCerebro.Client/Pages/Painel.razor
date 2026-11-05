@@ -16,10 +16,10 @@
         {
             <div class="cardx"><div class="small text-muted">Agora na fazenda</div>
                 <div class="stat">@clima.TemperaturaAtualC.ToString("N1") °C</div>
-                <div>💧 @clima.UmidadeAtualPct.ToString("N0")% · 💨 @clima.VentoAtualKmh.ToString("N0") km/h</div></div>
+                <div><i class="fa-solid fa-droplet"></i> @clima.UmidadeAtualPct.ToString("N0")% · <i class="fa-solid fa-wind"></i> @clima.VentoAtualKmh.ToString("N0") km/h</div></div>
         }
     </div>
-    <h2 class="h5 mt-3">🧠 Melhores janelas de aplicação</h2>
+    <h2 class="h5 mt-3"><i class="fa-solid fa-brain"></i> Melhores janelas de aplicação</h2>
     @if (p.Recomendacoes.Count == 0) { <p class="text-muted">Sem recomendações — cadastre talhões com plantio ativo.</p> }
     <div class="grid">
         @foreach (var r in p.Recomendacoes.Take(6))
@@ -28,11 +28,11 @@
                 <span class="badge badge-@r.Status.ToLower()">@r.Status</span> <strong>@r.BioinsumoNome</strong>
                 <div class="small text-muted">@r.TalhaoNome</div>
                 <div>@r.Motivo</div>
-                @foreach (var j in r.Janelas.Take(2)) { <div class="small">⏰ @j.Inicio.ToString("dd/MM HH:mm") – @j.Fim.ToString("HH:mm")</div> }
+                @foreach (var j in r.Janelas.Take(2)) { <div class="small"><i class="fa-solid fa-clock"></i> @j.Inicio.ToString("dd/MM HH:mm") – @j.Fim.ToString("HH:mm")</div> }
             </div>
         }
     </div>
-    <h2 class="h5 mt-3">🔔 Últimos alertas</h2>
+    <h2 class="h5 mt-3"><i class="fa-solid fa-bell"></i> Últimos alertas</h2>
     @foreach (var a in p.UltimosAlertas)
     { <div class="cardx nivel-@a.Nivel"><strong>@a.Titulo</strong><div>@a.Mensagem</div><div class="small text-muted">@a.CriadoEm.ToLocalTime().ToString("g")</div></div> }
 }

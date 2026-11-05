@@ -6,11 +6,11 @@
 <PageTitle>Mapa</PageTitle>
 <h1 class="h3">Mapa da propriedade</h1>
 <div class="d-flex gap-2 flex-wrap mb-2 align-items-center">
-    @if (!desenhando) { <button class="btn btn-primary btn-sm" @onclick="Iniciar">✏️ Desenhar talhão</button> }
+    @if (!desenhando) { <button class="btn btn-primary btn-sm" @onclick="Iniciar"><i class="fa-solid fa-pen"></i> Desenhar talhão</button> }
     else
     {
-        <button class="btn btn-success btn-sm" @onclick="Concluir">✔ Concluir</button>
-        <button class="btn btn-outline-secondary btn-sm" @onclick='() => JS.InvokeVoidAsync("mapa.undo")'>↩ Desfazer ponto</button>
+        <button class="btn btn-success btn-sm" @onclick="Concluir"><i class="fa-solid fa-check"></i> Concluir</button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick='() => JS.InvokeVoidAsync("mapa.undo")'><i class="fa-solid fa-rotate-left"></i> Desfazer ponto</button>
         <button class="btn btn-outline-danger btn-sm" @onclick="Cancelar">Cancelar</button>
         <span class="small">Toque no mapa para marcar os vértices.</span>
     }

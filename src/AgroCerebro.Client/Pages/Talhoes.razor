@@ -6,7 +6,7 @@
 @if (S.PropriedadeId == 0) { <div class="alert alert-info">Selecione ou cadastre uma propriedade.</div> }
 else
 {
-    <p><a href="mapa">🗺️ Desenhe o talhão no mapa</a> (área e polígono automáticos) ou cadastre manualmente abaixo.</p>
+    <p><a href="mapa"><i class="fa-solid fa-map-location-dot"></i> Desenhe o talhão no mapa</a> (área e polígono automáticos) ou cadastre manualmente abaixo.</p>
     <div class="grid">
     @foreach (var t in talhoes)
     {
@@ -14,13 +14,13 @@ else
             <strong>@t.Nome</strong> <span class="small text-muted">@t.AreaHa.ToString("N2") ha · @(t.TipoSoloNome ?? "solo n/i")</span>
             @if (t.PlantioAtivo is { } pl)
             {
-                <div>🌱 @pl.CulturaNome — plantio @pl.DataPlantio.ToString("dd/MM/yyyy")</div>
+                <div><i class="fa-solid fa-seedling"></i> @pl.CulturaNome — plantio @pl.DataPlantio.ToString("dd/MM/yyyy")</div>
                 <div class="small">BBCH @pl.BbchAtual: @Bbch.Estagio(pl.BbchAtual)</div>
             }
             else { <div class="text-muted small">Sem plantio ativo</div> }
             <div class="mt-2 d-flex gap-1 flex-wrap">
                 <button class="btn btn-sm btn-outline-success" @onclick="() => Abrir(t, 'p')">Plantio/BBCH</button>
-                <button class="btn btn-sm btn-outline-warning" @onclick="() => Abrir(t, 'o')">🐛 Praga</button>
+                <button class="btn btn-sm btn-outline-warning" @onclick="() => Abrir(t, 'o')"><i class="fa-solid fa-bug"></i> Praga</button>
                 <button class="btn btn-sm btn-outline-secondary" @onclick="() => Abrir(t, 'e')">Editar</button>
                 <button class="btn btn-sm btn-outline-danger" @onclick="() => Excluir(t.Id)">Excluir</button>
             </div>

@@ -2,7 +2,7 @@
 @inject HttpClient Http
 @inject Session S
 <PageTitle>Recomendações</PageTitle>
-<h1 class="h3">🧠 Recomendações de aplicação</h1>
+<h1 class="h3"><i class="fa-solid fa-brain"></i> Recomendações de aplicação</h1>
 <p class="text-muted">Cruzamos clima (72h), estágio BBCH, pragas e os requisitos biológicos de cada bioinsumo.</p>
 @if (erro != null) { <div class="alert alert-warning">@erro</div> }
 @if (lista == null && erro == null) { <p>Calculando…</p> }
@@ -16,7 +16,7 @@
         <div class="small text-muted">@r.TalhaoNome @(r.Pragas.Count > 0 ? "· alvo: " + string.Join(", ", r.Pragas) : "")</div>
         <p class="mb-1">@r.Motivo</p>
         @foreach (var j in r.Janelas)
-        { <div class="small">⏰ <strong>@j.Inicio.ToString("ddd dd/MM HH:mm")</strong> → @j.Fim.ToString("HH:mm") (nota @j.Pontuacao.ToString("N0")) – @j.Resumo</div> }
+        { <div class="small"><i class="fa-solid fa-clock"></i> <strong>@j.Inicio.ToString("ddd dd/MM HH:mm")</strong> → @j.Fim.ToString("HH:mm") (nota @j.Pontuacao.ToString("N0")) – @j.Resumo</div> }
     </div>
 }
 </div>

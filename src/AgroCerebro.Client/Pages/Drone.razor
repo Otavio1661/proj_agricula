@@ -4,7 +4,7 @@
 @inject Session S
 @inject IJSRuntime JS
 <PageTitle>Drone</PageTitle>
-<h1 class="h3">🚁 Mapeamento por drone</h1>
+<h1 class="h3"><i class="fa-solid fa-helicopter"></i> Mapeamento por drone</h1>
 <p class="text-muted">Envie ortomosaicos/fotos georreferenciados (JPG/PNG exportados do WebODM, DJI Terra, Pix4D…). Informe os limites (sul, oeste, norte, leste) em graus ou ajuste pelo mapa e use o botão de limites.</p>
 @if (S.PropriedadeId == 0) { <div class="alert alert-info">Selecione uma propriedade.</div> }
 else
@@ -31,7 +31,7 @@ else
             <div class="col-3"><input type="number" step="any" class="form-control" placeholder="Norte" @bind="norte" /></div>
             <div class="col-3"><input type="number" step="any" class="form-control" placeholder="Leste" @bind="leste" /></div>
         </div>
-        <div class="mt-2 d-flex gap-2"><button class="btn btn-outline-success" @onclick="LimitesDoMapa">📐 Usar limites da vista do mapa</button>
+        <div class="mt-2 d-flex gap-2"><button class="btn btn-outline-success" @onclick="LimitesDoMapa"><i class="fa-solid fa-ruler-combined"></i> Usar limites da vista do mapa</button>
             <button class="btn btn-primary" @onclick="Enviar">Enviar imagem</button></div>
         <div id="mapa" class="mapa mt-2" style="height:40vh"></div>
         @if (msg != null) { <div class="small mt-2">@msg</div> }

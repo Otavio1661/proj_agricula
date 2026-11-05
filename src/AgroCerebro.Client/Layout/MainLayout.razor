@@ -10,13 +10,13 @@ else if (S.Autenticado)
 {
     <div class="app-shell">
         <nav class="side">
-            <div class="brand">🌱 AgroCérebro</div>
+            <div class="brand"><i class="fa-solid fa-seedling"></i> AgroCérebro</div>
             @foreach (var (href, ico, nome) in Itens)
-            { <NavLink href="@href" Match="@(href=="" ? NavLinkMatch.All : NavLinkMatch.Prefix)">@ico @nome</NavLink> }
+            { <NavLink href="@href" Match="@(href=="" ? NavLinkMatch.All : NavLinkMatch.Prefix)"><i class="@ico"></i> @nome</NavLink> }
         </nav>
         <div class="main">
             <div class="topbar">
-                <strong class="d-md-none">🌱</strong>
+                <strong class="d-md-none"><i class="fa-solid fa-seedling"></i></strong>
                 <select class="form-select form-select-sm" value="@S.PropriedadeId" @onchange="Troca">
                     @if (S.Propriedades.Count == 0) { <option value="0">Sem propriedade</option> }
                     @foreach (var p in S.Propriedades) { <option value="@p.Id">@p.Nome</option> }
@@ -29,7 +29,7 @@ else if (S.Autenticado)
         </div>
         <nav class="tabbar">
             @foreach (var (href, ico, nome) in Itens)
-            { <NavLink href="@href" Match="@(href=="" ? NavLinkMatch.All : NavLinkMatch.Prefix)"><span>@ico</span>@nome</NavLink> }
+            { <NavLink href="@href" Match="@(href=="" ? NavLinkMatch.All : NavLinkMatch.Prefix)"><span><i class="@ico"></i></span>@nome</NavLink> }
         </nav>
     </div>
 }
@@ -38,9 +38,9 @@ else { <p class="p-3">Redirecionando…</p> }
 @code {
     bool online = true;
     static readonly (string, string, string)[] Itens = {
-        ("", "🏠", "Painel"), ("mapa", "🗺️", "Mapa"), ("talhoes", "🌾", "Talhões"), ("recomendacoes", "🧠", "Recomend."),
-        ("clima", "⛅", "Clima"), ("alertas", "🔔", "Alertas"), ("estoque", "📦", "Estoque"), ("whatsapp", "💬", "WhatsApp"), ("drone", "🚁", "Drone"),
-        ("catalogo", "🧪", "Bioinsumos"), ("propriedades", "🏡", "Fazendas") };
+        ("", "fa-solid fa-house", "Painel"), ("mapa", "fa-solid fa-map-location-dot", "Mapa"), ("talhoes", "fa-solid fa-wheat-awn", "Talhões"), ("recomendacoes", "fa-solid fa-brain", "Recomend."),
+        ("clima", "fa-solid fa-cloud-sun", "Clima"), ("alertas", "fa-solid fa-bell", "Alertas"), ("estoque", "fa-solid fa-boxes-stacked", "Estoque"), ("whatsapp", "fa-solid fa-comments", "WhatsApp"), ("drone", "fa-solid fa-helicopter", "Drone"),
+        ("catalogo", "fa-solid fa-flask-vial", "Bioinsumos"), ("propriedades", "fa-solid fa-tractor", "Fazendas") };
 
     protected override async Task OnInitializedAsync()
     {
