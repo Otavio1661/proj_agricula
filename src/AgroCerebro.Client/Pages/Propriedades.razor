@@ -54,7 +54,15 @@
 {
     <div class="cardx">
         <h2 class="h5">Equipe</h2>
-        <ul>@foreach (var m in membros) { <li>@m.Nome (@m.Email) – @m.Papel</li> }</ul>
+        <ul class="list-unstyled">@foreach (var m in membros) {
+            <li class="d-flex gap-2 align-items-center flex-wrap mb-2"><span>@m.Nome (@m.Email)</span>
+                @if (m.Papel == "Dono") { <span class="badge bg-success">Dono</span> }
+                else
+                {
+                    <select class="form-select form-select-sm w-auto" value="@m.Papel" @onchange="e => MudarPapel(m.UsuarioId, e)"><option value="Agronomo">Agrônomo</option><option value="Operador">Operador</option></select>
+                    <ConfirmaExcluir Texto="Remover" OnConfirmar="() => RemoverMembro(m.UsuarioId)" />
+                }
+            </li> }</ul>
         <div class="row g-3 align-items-end">
             <div class="col-12 col-md-5 field"><label class="req" for="m-email">E-mail do usuário</label><input id="m-email" type="email" class="form-control" placeholder="pessoa@exemplo.com" @bind="convEmail" /><div class="hint">A pessoa precisa já ter criado conta.</div></div>
             <div class="col-8 col-md-4 field"><label for="m-papel">Papel</label><select id="m-papel" class="form-select" @bind="convPapel"><option value="Agronomo">Agrônomo (edita)</option><option value="Operador">Operador (consulta e registra)</option></select></div>
@@ -106,6 +114,19 @@
         var r = await Http.DeleteAsync($"api/propriedades/{id}");
         msgOk = r.IsSuccessStatusCode; msg = msgOk ? "Propriedade excluída." : await Forms.ErroAsync(r, "Não foi possível excluir");
         await S.RecarregarPropriedadesAsync();
+    }
+    async Task MudarPapel(int uid, ChangeEventArgs ev)
+    {
+        var papel = ev.Value?.ToString() == "Agronomo" ? "Agronomo" : "Operador";
+        var r = await Http.PutAsJsonAsync($"api/propriedades/{membrosId}/membros/{uid}", new ConvidarMembroRequest("", papel));
+        msgOk = r.IsSuccessStatusCode; msg = msgOk ? "Papel atualizado." : await Forms.ErroAsync(r, "Não foi possível alterar o papel");
+        await Membros(membrosId);
+    }
+    async Task RemoverMembro(int uid)
+    {
+        var r = await Http.DeleteAsync($"api/propriedades/{membrosId}/membros/{uid}");
+        msgOk = r.IsSuccessStatusCode; msg = msgOk ? "Membro removido da equipe." : await Forms.ErroAsync(r, "Não foi possível remover");
+        await Membros(membrosId);
     }
     async Task Membros(int id) { membrosId = id; membros = await Http.GetFromJsonAsync<List<MembroDto>>($"api/propriedades/{id}/membros"); }
     async Task Convidar()

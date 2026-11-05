@@ -3,7 +3,7 @@
 @inject Session S
 <PageTitle>Alertas</PageTitle>
 <h1 class="h3"><i class="fa-solid fa-bell"></i> Alertas</h1>
-<button class="btn btn-sm btn-primary mb-2" @onclick="Gerar" disabled="@(S.PropriedadeId == 0)">Avaliar agora</button> <span class="small">@msg</span>
+<button class="btn btn-sm btn-primary mb-2" @onclick="Gerar" disabled="@(S.PropriedadeId == 0)">Avaliar agora</button> <button class="btn btn-sm btn-outline-secondary mb-2" @onclick="TodosLidos" disabled="@(S.PropriedadeId == 0 || lista.All(x => x.Lido))">Marcar todos como lidos</button> <span class="small">@msg</span>
 @if (erro != null) { <div class="alert alert-warning">@erro</div> }
 @if (lista.Count == 0 && erro == null) { <p class="text-muted">Sem alertas.</p> }
 @foreach (var a in lista)
@@ -11,7 +11,10 @@
     <div class="cardx nivel-@a.Nivel" style="@(a.Lido ? "opacity:.6" : "")">
         <div class="d-flex justify-content-between"><strong>@a.Titulo</strong><span class="small text-muted">@a.Tipo · @a.CriadoEm.ToLocalTime().ToString("g")</span></div>
         <div>@a.Mensagem</div>
-        @if (!a.Lido) { <button class="btn btn-sm btn-outline-secondary mt-1" @onclick="() => Lido(a.Id)">Marcar como lido</button> }
+        <div class="d-flex gap-2 flex-wrap mt-1">
+            @if (!a.Lido) { <button class="btn btn-sm btn-outline-secondary" @onclick="() => Lido(a.Id)">Marcar como lido</button> }
+            <ConfirmaExcluir OnConfirmar="() => Excluir(a.Id)" />
+        </div>
     </div>
 }
 @code {
@@ -28,5 +31,7 @@
         try { if (S.PropriedadeId > 0) lista = await Http.GetFromJsonAsync<List<AlertaDto>>($"api/propriedades/{S.PropriedadeId}/alertas") ?? new(); }
         catch { erro = "Alertas indisponíveis (offline?)."; }
     }
+    async Task TodosLidos() { await Http.PostAsync($"api/propriedades/{S.PropriedadeId}/alertas/lidos", null); await Carregar(); }
+    async Task Excluir(int id) { var r = await Http.DeleteAsync($"api/alertas/{id}"); msg = r.IsSuccessStatusCode ? "Alerta excluído." : await Forms.ErroAsync(r, "Não foi possível excluir"); await Carregar(); }
     async Task Lido(int id) { await Http.PostAsync($"api/alertas/{id}/lido", null); await Carregar(); }
 }

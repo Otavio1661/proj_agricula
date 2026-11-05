@@ -42,11 +42,36 @@ else
         <div id="mapa" class="mapa mt-3" style="height:40vh"></div>
         <FormMsg Texto="@msg" Ok="@msgOk" />
     </div>
-    <h2 class="h5">Imagens da missão</h2>
-    <div class="grid">
-    @foreach (var i in missoes.SelectMany(m => m.Imagens))
-    { <div class="cardx"><img src="@i.Url" style="max-width:100%;max-height:160px" /><div class="small">#@i.Id @i.Tipo @(i.GsdCm != null ? $"· {i.GsdCm} cm/px" : "")</div></div> }
-    </div>
+    <h2 class="h5">Missões e imagens do talhão</h2>
+    @if (talhaoId == 0) { <p class="text-muted small">Escolha o talhão no passo 1 para ver as missões.</p> }
+    @if (editMissaoId != 0)
+    {
+        <div class="cardx">
+            <h3 class="h6">Editar missão #@editMissaoId</h3>
+            <div class="row g-3">
+                <div class="col-6 col-md-3 field"><label class="req" for="em-data">Data do voo</label><input id="em-data" type="date" class="form-control" @bind="emData" /></div>
+                <div class="col-6 col-md-2 field"><label for="em-alt">Altura (m)</label><input id="em-alt" type="number" step="any" min="1" max="500" class="form-control" @bind="emAlt" /></div>
+                <div class="col-12 col-md-4 field"><label for="em-eq">Equipamento</label><input id="em-eq" class="form-control" maxlength="80" @bind="emEquip" /></div>
+                <div class="col-12 col-md-3 field"><label for="em-st">Status</label><select id="em-st" class="form-select" @bind="emStatus"><option>Concluida</option><option>Planejada</option><option>Processando</option><option>Cancelada</option></select></div>
+                <div class="col-12 field"><label for="em-n">Notas</label><input id="em-n" class="form-control" maxlength="400" @bind="emNotas" /></div>
+            </div>
+            <div class="form-actions"><button class="btn btn-primary" @onclick="SalvarMissao" disabled="@busy">Salvar missão</button><button class="btn btn-link" @onclick="() => editMissaoId = 0">Cancelar</button></div>
+        </div>
+    }
+    @foreach (var m in missoes)
+    {
+        <div class="cardx">
+            <div class="d-flex gap-2 align-items-center flex-wrap">
+                <strong>Missão #@m.Id</strong> <span class="small text-muted">@m.Data.ToString("dd/MM/yyyy") · @(m.Equipamento ?? "equipamento n/i") · @(m.AlturaM?.ToString("0") ?? "-") m · @m.Status</span>
+                <button class="btn btn-sm btn-outline-secondary ms-auto" @onclick="() => EditaMissao(m)"><i class="fa-solid fa-pen"></i> Editar</button>
+                <ConfirmaExcluir Texto="Excluir missão" OnConfirmar="() => ExcluirMissao(m.Id)" />
+            </div>
+            <div class="grid mt-2">
+            @foreach (var i in m.Imagens)
+            { <div class="cardx mb-0"><img src="@i.Url" style="max-width:100%;max-height:160px" /><div class="small">#@i.Id @i.Tipo @(i.GsdCm != null ? $"· {i.GsdCm} cm/px" : "")</div><ConfirmaExcluir Texto="Excluir imagem" OnConfirmar="() => ExcluirImagem(i.Id)" /></div> }
+            </div>
+        </div>
+    }
 }
 @code {
     List<TalhaoDto> talhoes = new(); List<MissaoDroneDto> missoes = new();
@@ -63,6 +88,32 @@ else
     protected override async Task OnAfterRenderAsync(bool first)
     {
         if (first && S.Propriedade is { } p) await JS.InvokeVoidAsync("mapa.init", "mapa", p.Latitude, p.Longitude);
+    }
+    int editMissaoId; DateTime emData = DateTime.Today; double? emAlt; string? emEquip, emNotas, emStatus = "Concluida";
+    void EditaMissao(MissaoDroneDto m) { editMissaoId = m.Id; emData = m.Data; emAlt = m.AlturaM; emEquip = m.Equipamento; emStatus = m.Status ?? "Concluida"; emNotas = null; msg = ""; }
+    async Task SalvarMissao()
+    {
+        busy = true;
+        try
+        {
+            var r = await Http.PutAsJsonAsync($"api/missoes/{editMissaoId}", new MissaoDroneEditarRequest(emData, emEquip, emAlt, emNotas, emStatus));
+            msgOk = r.IsSuccessStatusCode; msg = msgOk ? "Missão atualizada." : await Forms.ErroAsync(r, "Não foi possível atualizar");
+            if (msgOk) { editMissaoId = 0; await CarregarMissoes(); }
+        }
+        catch (Exception ex) { msgOk = false; msg = "Falha de conexão: " + ex.Message; }
+        finally { busy = false; }
+    }
+    async Task ExcluirMissao(int id)
+    {
+        var r = await Http.DeleteAsync($"api/missoes/{id}");
+        msgOk = r.IsSuccessStatusCode; msg = msgOk ? "Missão excluída." : await Forms.ErroAsync(r, "Não foi possível excluir");
+        if (msgOk) { if (missaoId == id) missaoId = 0; await CarregarMissoes(); }
+    }
+    async Task ExcluirImagem(int id)
+    {
+        var r = await Http.DeleteAsync($"api/imagens/{id}");
+        msgOk = r.IsSuccessStatusCode; msg = msgOk ? "Imagem excluída." : await Forms.ErroAsync(r, "Não foi possível excluir");
+        if (msgOk) await CarregarMissoes();
     }
     async Task CarregarMissoes() { missoes = talhaoId == 0 ? new() : await Http.GetFromJsonAsync<List<MissaoDroneDto>>($"api/talhoes/{talhaoId}/missoes") ?? new(); }
     async Task CriarMissao()

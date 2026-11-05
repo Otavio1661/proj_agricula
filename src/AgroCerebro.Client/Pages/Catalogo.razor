@@ -1,29 +1,206 @@
 @page "/catalogo"
 @inject HttpClient Http
+@inject Session S
 <PageTitle>Bioinsumos</PageTitle>
-<h1 class="h3"><i class="fa-solid fa-flask-vial"></i> Catálogo de bioinsumos</h1>
-<p class="text-muted">Requisitos biológicos usados pelo motor de recomendação.</p>
-@if (erro != null) { <div class="alert alert-warning">@erro</div> }
-<div class="table-wrap cardx">
-<table class="table table-sm table-striped">
-    <thead><tr><th>Produto</th><th>Tipo</th><th>Temp (°C)</th><th>UR (%)</th><th>BBCH</th><th>Chuva máx</th><th>Vento máx</th><th>Armazenar até</th><th>Culturas</th><th>Alvos</th></tr></thead>
-    <tbody>
-    @foreach (var b in lista)
-    {
-        <tr><td><strong>@b.Nome</strong><div class="small text-muted">@b.AgenteAtivo</div></td><td>@b.Tipo</td>
-            <td>@b.TempMin–@b.TempMax</td><td>@b.UmidadeMin–@b.UmidadeMax</td><td>@b.BbchMin–@b.BbchMax</td>
-            <td>@b.ChuvaMaxMm mm</td><td>@b.VentoMaxKmh km/h</td>
-            <td>@b.ArmazTempMax °C<div class="small">@b.ArmazInstrucoes</div></td>
-            <td>@string.Join(", ", b.Culturas)</td><td>@string.Join(", ", b.Pragas)</td></tr>
-    }
-    </tbody>
-</table>
+<h1 class="h3"><i class="fa-solid fa-flask-vial"></i> Catálogo</h1>
+<p class="text-muted">Requisitos biológicos usados pelo motor de recomendação.@(admin ? " Como administrador você pode adicionar, editar e excluir." : " Somente o administrador edita o catálogo.")</p>
+
+<div class="tabs-crud">
+    <button class="btn btn-sm btn-outline-success @(aba == "bio" ? "active" : "")" @onclick='() => Aba("bio")'>Bioinsumos</button>
+    <button class="btn btn-sm btn-outline-success @(aba == "cul" ? "active" : "")" @onclick='() => Aba("cul")'>Culturas</button>
+    <button class="btn btn-sm btn-outline-success @(aba == "pra" ? "active" : "")" @onclick='() => Aba("pra")'>Pragas</button>
+    <button class="btn btn-sm btn-outline-success @(aba == "sol" ? "active" : "")" @onclick='() => Aba("sol")'>Tipos de solo</button>
 </div>
-@code {
-    List<BioinsumoDto> lista = new(); string? erro;
-    protected override async Task OnInitializedAsync()
+@if (erro != null) { <div class="alert alert-warning">@erro</div> }
+<FormMsg Texto="@msg" Ok="@msgOk" />
+
+@if (aba == "bio")
+{
+    @if (admin && !editandoBio) { <button class="btn btn-primary mb-2" @onclick="NovoBio"><i class="fa-solid fa-plus"></i> Novo bioinsumo</button> }
+    @if (editandoBio)
     {
-        try { lista = await Http.GetFromJsonAsync<List<BioinsumoDto>>("api/catalogo/bioinsumos") ?? new(); }
+        <div class="cardx">
+            <h2 class="h5">@(bioId == 0 ? "Novo bioinsumo" : "Editar bioinsumo")</h2>
+            <p class="hint">Campos com <span class="req"></span> são obrigatórios.</p>
+            <div class="form-sec">Identificação</div>
+            <div class="row g-3">
+                <div class="col-12 col-md-5 field"><label class="req" for="b-nome">Nome do produto</label><input id="b-nome" class="form-control" maxlength="120" placeholder="Ex.: Beauveria bassiana" @bind="f.Nome" /></div>
+                <div class="col-6 col-md-3 field"><label class="req" for="b-tipo">Tipo</label>
+                    <select id="b-tipo" class="form-select" @bind="f.Tipo"><option>Fungo</option><option>Bactéria</option><option>Vírus</option><option>Macrorganismo</option><option>Extrato</option></select></div>
+                <div class="col-6 col-md-4 field"><label for="b-ag">Agente ativo</label><input id="b-ag" class="form-control" maxlength="150" @bind="f.AgenteAtivo" /></div>
+                <div class="col-12 field"><label for="b-desc">Descrição</label><input id="b-desc" class="form-control" maxlength="500" @bind="f.Descricao" /></div>
+            </div>
+            <div class="form-sec">Condições de aplicação</div>
+            <div class="row g-3">
+                <div class="col-6 col-md-3 field"><label for="b-tmin">Temp. mínima (°C)</label><input id="b-tmin" type="number" step="any" class="form-control" @bind="f.TempMin" /></div>
+                <div class="col-6 col-md-3 field"><label for="b-tmax">Temp. máxima (°C)</label><input id="b-tmax" type="number" step="any" class="form-control" @bind="f.TempMax" /></div>
+                <div class="col-6 col-md-3 field"><label for="b-umin">Umidade mínima (%)</label><input id="b-umin" type="number" step="any" min="0" max="100" class="form-control" @bind="f.UmidadeMin" /></div>
+                <div class="col-6 col-md-3 field"><label for="b-umax">Umidade máxima (%)</label><input id="b-umax" type="number" step="any" min="0" max="100" class="form-control" @bind="f.UmidadeMax" /></div>
+                <div class="col-6 col-md-3 field"><label for="b-bmin">BBCH mínimo</label><input id="b-bmin" type="number" min="0" max="99" class="form-control" @bind="f.BbchMin" /></div>
+                <div class="col-6 col-md-3 field"><label for="b-bmax">BBCH máximo</label><input id="b-bmax" type="number" min="0" max="99" class="form-control" @bind="f.BbchMax" /></div>
+                <div class="col-6 col-md-3 field"><label for="b-ch">Chuva máx. tolerada (mm)</label><input id="b-ch" type="number" step="any" min="0" class="form-control" @bind="f.ChuvaMaxMm" /></div>
+                <div class="col-6 col-md-3 field"><label for="b-vt">Vento máx. (km/h)</label><input id="b-vt" type="number" step="any" min="0" class="form-control" @bind="f.VentoMaxKmh" /></div>
+                <div class="col-12 field"><label class="d-flex gap-2 align-items-center"><input type="checkbox" @bind="f.EvitarSolDireto" /> Evitar sol direto (UV inativa o produto — aplicar fim de tarde/noite)</label></div>
+            </div>
+            <div class="form-sec">Armazenamento</div>
+            <div class="row g-3">
+                <div class="col-6 col-md-3 field"><label for="b-at">Armazenar até (°C)</label><input id="b-at" type="number" step="any" class="form-control" @bind="f.ArmazTempMax" /></div>
+                <div class="col-6 col-md-3 field"><label for="b-vm">Validade (meses)</label><input id="b-vm" type="number" min="0" class="form-control" @bind="f.ValidadeMeses" /></div>
+                <div class="col-12 col-md-6 field"><label for="b-ai">Instruções</label><input id="b-ai" class="form-control" maxlength="400" placeholder="Ex.: Refrigerado 2–8 °C" @bind="f.ArmazInstrucoes" /></div>
+            </div>
+            <div class="form-sec">Culturas e pragas-alvo</div>
+            <div class="row g-3">
+                <div class="col-12 col-md-6 field"><label>Culturas</label><div class="checks">@foreach (var c in culturas) { var id = c.Id; <label><input type="checkbox" checked="@f.CulturaIds.Contains(id)" @onchange="e => Alterna(f.CulturaIds, id, (bool)e.Value!)" /> @c.Nome</label> }</div></div>
+                <div class="col-12 col-md-6 field"><label>Pragas-alvo</label><div class="checks">@foreach (var p in pragas) { var id = p.Id; <label><input type="checkbox" checked="@f.PragaIds.Contains(id)" @onchange="e => Alterna(f.PragaIds, id, (bool)e.Value!)" /> @p.Nome</label> }</div></div>
+            </div>
+            <div class="form-actions"><button class="btn btn-primary" @onclick="SalvarBio" disabled="@busy">@(busy ? "Salvando…" : "Salvar")</button><button class="btn btn-link" @onclick="() => editandoBio = false">Cancelar</button></div>
+        </div>
+    }
+    <div class="table-wrap cardx">
+    <table class="table table-sm table-striped">
+        <thead><tr><th>Produto</th><th>Tipo</th><th>Temp (°C)</th><th>UR (%)</th><th>BBCH</th><th>Chuva máx</th><th>Vento máx</th><th>Armazenar até</th><th>Culturas</th><th>Alvos</th>@if (admin) { <th></th> }</tr></thead>
+        <tbody>
+        @foreach (var b in lista)
+        {
+            <tr><td><strong>@b.Nome</strong><div class="small text-muted">@b.AgenteAtivo</div></td><td>@b.Tipo</td>
+                <td>@b.TempMin–@b.TempMax</td><td>@b.UmidadeMin–@b.UmidadeMax</td><td>@b.BbchMin–@b.BbchMax</td>
+                <td>@b.ChuvaMaxMm mm</td><td>@b.VentoMaxKmh km/h</td>
+                <td>@b.ArmazTempMax °C<div class="small">@b.ArmazInstrucoes</div></td>
+                <td>@string.Join(", ", b.Culturas)</td><td>@string.Join(", ", b.Pragas)</td>
+                @if (admin) { <td class="text-nowrap"><button class="btn btn-sm btn-outline-secondary" @onclick="() => EditarBio(b.Id)"><i class="fa-solid fa-pen"></i></button> <ConfirmaExcluir Texto="" OnConfirmar="() => Excluir('b', b.Id)" /></td> }
+            </tr>
+        }
+        </tbody>
+    </table>
+    </div>
+}
+else if (aba == "cul")
+{
+    <div class="cardx">
+        @if (admin)
+        {
+            <div class="row g-3">
+                <div class="col-12 col-md-4 field"><label class="req" for="c-n">Nome da cultura</label><input id="c-n" class="form-control" maxlength="80" placeholder="Ex.: Trigo" @bind="nomeAux" /></div>
+                <div class="col-12 col-md-5 field"><label for="c-d">Descrição</label><input id="c-d" class="form-control" maxlength="300" @bind="descAux" /></div>
+                <div class="col-12 col-md-3 field d-flex align-items-end gap-2">
+                    <button class="btn btn-primary" @onclick="SalvarCultura" disabled="@busy">@(editId == 0 ? "Adicionar" : "Salvar")</button>
+                    @if (editId != 0) { <button class="btn btn-link" @onclick="LimpaAux">Cancelar</button> }</div>
+            </div>
+        }
+        <table class="table table-sm mt-3"><thead><tr><th>Cultura</th><th>Descrição</th>@if (admin) { <th></th> }</tr></thead><tbody>
+        @foreach (var c in culturas)
+        { <tr><td>@c.Nome</td><td>@c.Descricao</td>@if (admin) { <td class="text-nowrap"><button class="btn btn-sm btn-outline-secondary" @onclick="() => EditaAux(c.Id, c.Nome, c.Descricao)"><i class="fa-solid fa-pen"></i></button> <ConfirmaExcluir Texto="" OnConfirmar="() => Excluir('c', c.Id)" /></td>}</tr> }
+        </tbody></table>
+    </div>
+}
+else if (aba == "pra")
+{
+    <div class="cardx">
+        @if (admin)
+        {
+            <div class="row g-3">
+                <div class="col-12 col-md-6 field"><label class="req" for="p-n">Nome da praga / doença</label><input id="p-n" class="form-control" maxlength="120" placeholder="Ex.: Ferrugem-do-café" @bind="nomeAux" /></div>
+                <div class="col-6 col-md-3 field"><label for="p-t">Tipo</label>
+                    <select id="p-t" class="form-select" @bind="descAux"><option>Inseto</option><option>Fungo</option><option>Nematoide</option><option>Ácaro</option><option>Bactéria</option><option>Planta daninha</option></select></div>
+                <div class="col-6 col-md-3 field d-flex align-items-end gap-2">
+                    <button class="btn btn-primary" @onclick="SalvarPraga" disabled="@busy">@(editId == 0 ? "Adicionar" : "Salvar")</button>
+                    @if (editId != 0) { <button class="btn btn-link" @onclick="LimpaAux">Cancelar</button> }</div>
+            </div>
+        }
+        <table class="table table-sm mt-3"><thead><tr><th>Praga</th><th>Tipo</th>@if (admin) { <th></th> }</tr></thead><tbody>
+        @foreach (var p in pragas)
+        { <tr><td>@p.Nome</td><td>@p.Tipo</td>@if (admin) { <td class="text-nowrap"><button class="btn btn-sm btn-outline-secondary" @onclick="() => EditaAux(p.Id, p.Nome, p.Tipo)"><i class="fa-solid fa-pen"></i></button> <ConfirmaExcluir Texto="" OnConfirmar="() => Excluir('p', p.Id)" /></td>}</tr> }
+        </tbody></table>
+    </div>
+}
+else
+{
+    <div class="cardx">
+        @if (admin)
+        {
+            <div class="row g-3">
+                <div class="col-12 col-md-5 field"><label class="req" for="s-n">Tipo de solo</label><input id="s-n" class="form-control" maxlength="80" placeholder="Ex.: Cambissolo" @bind="nomeAux" /></div>
+                <div class="col-12 col-md-4 field"><label for="s-t">Textura</label><input id="s-t" class="form-control" maxlength="40" placeholder="Ex.: Média" @bind="descAux" /></div>
+                <div class="col-12 col-md-3 field d-flex align-items-end gap-2">
+                    <button class="btn btn-primary" @onclick="SalvarSolo" disabled="@busy">@(editId == 0 ? "Adicionar" : "Salvar")</button>
+                    @if (editId != 0) { <button class="btn btn-link" @onclick="LimpaAux">Cancelar</button> }</div>
+            </div>
+        }
+        <table class="table table-sm mt-3"><thead><tr><th>Solo</th><th>Textura</th>@if (admin) { <th></th> }</tr></thead><tbody>
+        @foreach (var s in solos)
+        { <tr><td>@s.Nome</td><td>@s.Textura</td>@if (admin) { <td class="text-nowrap"><button class="btn btn-sm btn-outline-secondary" @onclick="() => EditaAux(s.Id, s.Nome, s.Textura)"><i class="fa-solid fa-pen"></i></button> <ConfirmaExcluir Texto="" OnConfirmar="() => Excluir('s', s.Id)" /></td>}</tr> }
+        </tbody></table>
+    </div>
+}
+@code {
+    List<BioinsumoDto> lista = new(); List<CulturaDto> culturas = new(); List<PragaDto> pragas = new(); List<TipoSoloDto> solos = new();
+    string? erro, msg; bool msgOk, busy, admin, editandoBio; string aba = "bio"; int bioId, editId; string nomeAux = "", descAux = "";
+    BioinsumoSalvarRequest f = Novo();
+
+    static BioinsumoSalvarRequest Novo() => new();
+
+    protected override async Task OnInitializedAsync() { admin = await S.EAdminAsync(); await Carregar(); }
+    async Task Carregar()
+    {
+        try
+        {
+            lista = await Http.GetFromJsonAsync<List<BioinsumoDto>>("api/catalogo/bioinsumos") ?? new();
+            culturas = await Http.GetFromJsonAsync<List<CulturaDto>>("api/catalogo/culturas") ?? new();
+            pragas = await Http.GetFromJsonAsync<List<PragaDto>>("api/catalogo/pragas") ?? new();
+            solos = await Http.GetFromJsonAsync<List<TipoSoloDto>>("api/catalogo/solos") ?? new();
+        }
         catch { erro = "Catálogo indisponível (offline?)."; }
+    }
+    void Aba(string a) { aba = a; LimpaAux(); editandoBio = false; msg = ""; }
+    void LimpaAux() { editId = 0; nomeAux = ""; descAux = aba == "pra" ? "Inseto" : ""; }
+    static void Alterna(List<int> l, int id, bool on) { if (on) { if (!l.Contains(id)) l.Add(id); } else l.Remove(id); }
+
+    void NovoBio() { bioId = 0; f = Novo(); editandoBio = true; msg = ""; }
+    async Task EditarBio(int id)
+    {
+        var r = await Http.GetFromJsonAsync<BioinsumoEdicaoDto>($"api/catalogo/bioinsumos/{id}/editar");
+        if (r == null) return;
+        bioId = id; f = r.Dados; editandoBio = true; msg = "";
+    }
+
+    async Task<bool> Envia(Func<Task<HttpResponseMessage>> a, string ok, string falha)
+    {
+        busy = true;
+        try { var r = await a(); msgOk = r.IsSuccessStatusCode; msg = msgOk ? ok : await Forms.ErroAsync(r, falha); return msgOk; }
+        catch (Exception ex) { msgOk = false; msg = "Falha de conexão: " + ex.Message; return false; }
+        finally { busy = false; }
+    }
+    async Task SalvarBio()
+    {
+        if (string.IsNullOrWhiteSpace(f.Nome)) { msgOk = false; msg = "Informe o nome do produto."; return; }
+        if (f.TempMin > f.TempMax) { msgOk = false; msg = "Temperatura mínima não pode ser maior que a máxima."; return; }
+        if (f.UmidadeMin > f.UmidadeMax || f.UmidadeMin < 0 || f.UmidadeMax > 100) { msgOk = false; msg = "Umidade deve estar entre 0 e 100% (mínima ≤ máxima)."; return; }
+        if (f.BbchMin > f.BbchMax || f.BbchMin < 0 || f.BbchMax > 99) { msgOk = false; msg = "BBCH deve estar entre 0 e 99 (mínimo ≤ máximo)."; return; }
+        if (await Envia(() => bioId == 0 ? Http.PostAsJsonAsync("api/catalogo/bioinsumos", f) : Http.PutAsJsonAsync($"api/catalogo/bioinsumos/{bioId}", f), "Bioinsumo salvo.", "Não foi possível salvar"))
+        { editandoBio = false; await Carregar(); }
+    }
+    async Task SalvarCultura()
+    {
+        if (string.IsNullOrWhiteSpace(nomeAux)) { msgOk = false; msg = "Informe o nome da cultura."; return; }
+        var req = new CulturaSalvarRequest(nomeAux.Trim(), string.IsNullOrWhiteSpace(descAux) ? null : descAux);
+        if (await Envia(() => editId == 0 ? Http.PostAsJsonAsync("api/catalogo/culturas", req) : Http.PutAsJsonAsync($"api/catalogo/culturas/{editId}", req), "Cultura salva.", "Não foi possível salvar")) { LimpaAux(); await Carregar(); }
+    }
+    async Task SalvarPraga()
+    {
+        if (string.IsNullOrWhiteSpace(nomeAux)) { msgOk = false; msg = "Informe o nome da praga."; return; }
+        var req = new PragaSalvarRequest(nomeAux.Trim(), string.IsNullOrWhiteSpace(descAux) ? "Inseto" : descAux);
+        if (await Envia(() => editId == 0 ? Http.PostAsJsonAsync("api/catalogo/pragas", req) : Http.PutAsJsonAsync($"api/catalogo/pragas/{editId}", req), "Praga salva.", "Não foi possível salvar")) { LimpaAux(); await Carregar(); }
+    }
+    async Task SalvarSolo()
+    {
+        if (string.IsNullOrWhiteSpace(nomeAux)) { msgOk = false; msg = "Informe o nome do tipo de solo."; return; }
+        var req = new TipoSoloSalvarRequest(nomeAux.Trim(), descAux ?? "");
+        if (await Envia(() => editId == 0 ? Http.PostAsJsonAsync("api/catalogo/solos", req) : Http.PutAsJsonAsync($"api/catalogo/solos/{editId}", req), "Tipo de solo salvo.", "Não foi possível salvar")) { LimpaAux(); await Carregar(); }
+    }
+    void EditaAux(int id, string nome, string? desc) { editId = id; nomeAux = nome; descAux = desc ?? ""; }
+    async Task Excluir(char tipo, int id)
+    {
+        var url = $"api/catalogo/{tipo switch { 'b' => "bioinsumos", 'c' => "culturas", 'p' => "pragas", _ => "solos" }}/{id}";
+        if (await Envia(() => Http.DeleteAsync(url), "Excluído.", "Não foi possível excluir")) await Carregar();
     }
 }

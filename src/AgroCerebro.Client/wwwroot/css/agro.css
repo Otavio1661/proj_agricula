@@ -48,3 +48,10 @@ a, .btn-link { color: var(--verde); }
 .form-actions { display:flex; gap:.5rem; flex-wrap:wrap; margin-top:1rem; align-items:center; }
 .form-sec { font-size:.8rem; text-transform:uppercase; letter-spacing:.04em; color:var(--terra); font-weight:700; margin:.9rem 0 .3rem; }
 @media (max-width:768px) { .form-actions .btn { flex:1 1 100%; } .form-control, .form-select { font-size:16px; } }
+
+/* ===== CRUD ===== */
+.confirma { display:inline-flex; gap:.35rem; align-items:center; flex-wrap:wrap; }
+.checks { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:.25rem .75rem; max-height:180px; overflow:auto; border:1px solid #b9c7b4; border-radius:8px; padding:.5rem; background:#fff; }
+.checks label { font-weight:400; font-size:.85rem; display:flex; gap:.4rem; align-items:center; margin:0; }
+.tabs-crud { display:flex; gap:.25rem; flex-wrap:wrap; margin-bottom:.75rem; }
+.tabs-crud .btn.active { background:var(--verde); color:#fff; border-color:var(--verde); }

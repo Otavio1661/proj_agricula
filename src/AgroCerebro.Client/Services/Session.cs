@@ -21,6 +21,15 @@ public class Session
     public PropriedadeDto? Propriedade => Propriedades.FirstOrDefault(p => p.Id == PropriedadeId);
     public event Action? Mudou;
 
+    bool? _admin;
+    /// <summary>Consulta (e guarda) se o usuário é o administrador do catálogo.</summary>
+    public async Task<bool> EAdminAsync()
+    {
+        if (_admin is { } a) return a;
+        try { _admin = await _http.GetFromJsonAsync<bool>("api/catalogo/eu-admin"); } catch { return false; }
+        return _admin.Value;
+    }
+
     public async Task CarregarAsync()
     {
         if (Carregado) return;
@@ -43,7 +52,7 @@ public class Session
 
     public async Task SairAsync()
     {
-        Token = null; Usuario = null; Propriedades = new(); PropriedadeId = 0;
+        Token = null; Usuario = null; Propriedades = new(); PropriedadeId = 0; _admin = null;
         await _js.InvokeVoidAsync("agro.remove", "token");
         await _js.InvokeVoidAsync("agro.remove", "usuario");
         Mudou?.Invoke();

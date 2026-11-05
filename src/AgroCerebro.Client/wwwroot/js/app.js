@@ -9,3 +9,4 @@ window.agro = {
     window.addEventListener('online', f); window.addEventListener('offline', f);
   }
 };
+window.agro.qrSvg = text => { const q = qrcode(0, 'M'); q.addData(text); q.make(); return q.createSvgTag({ scalable: true, margin: 2 }).replace('<svg', '<svg style="max-width:280px;width:100%"'); };

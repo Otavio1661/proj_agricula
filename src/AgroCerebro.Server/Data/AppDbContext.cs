@@ -25,6 +25,7 @@ public class AppDbContext : DbContext
     public DbSet<MissaoDrone> MissoesDrone => Set<MissaoDrone>();
     public DbSet<ImagemDrone> ImagensDrone => Set<ImagemDrone>();
     public DbSet<ContatoWhatsApp> ContatosWhatsApp => Set<ContatoWhatsApp>();
+    public DbSet<Configuracao> Configuracoes => Set<Configuracao>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {

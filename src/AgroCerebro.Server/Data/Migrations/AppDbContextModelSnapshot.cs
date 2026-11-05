@@ -636,6 +636,21 @@ namespace AgroCerebro.Server.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("AgroCerebro.Server.Domain.Configuracao", b =>
+                {
+                    b.Property<string>("Chave")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<string>("Valor")
+                        .HasMaxLength(300)
+                        .HasColumnType("varchar(300)");
+
+                    b.HasKey("Chave");
+
+                    b.ToTable("Configuracoes");
+                });
+
             modelBuilder.Entity("AgroCerebro.Server.Domain.ContatoWhatsApp", b =>
                 {
                     b.Property<int>("Id")

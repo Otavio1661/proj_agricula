@@ -8,20 +8,21 @@ else
 {
     <div class="table-wrap cardx">
         <table class="table table-sm">
-            <thead><tr><th>Produto</th><th>Lote</th><th>Qtd</th><th>Validade</th><th>Temp. armaz.</th></tr></thead>
+            <thead><tr><th>Produto</th><th>Lote</th><th>Qtd</th><th>Validade</th><th>Temp. armaz.</th><th></th></tr></thead>
             <tbody>
             @foreach (var l in lotes)
             {
                 var venc = l.Validade < DateTime.Today.AddDays(30);
                 <tr><td>@l.BioinsumoNome</td><td>@l.Lote</td><td>@l.Quantidade @l.Unidade</td>
                     <td class="@(venc ? "text-danger fw-bold" : "")">@l.Validade.ToString("dd/MM/yyyy")</td>
-                    <td>@(l.TempArmazenamentoC?.ToString("N1") ?? "-") °C</td></tr>
+                    <td>@(l.TempArmazenamentoC?.ToString("N1") ?? "-") °C</td>
+                    <td class="text-nowrap"><button class="btn btn-sm btn-outline-secondary" @onclick="() => Editar(l)"><i class="fa-solid fa-pen"></i> Editar</button> <ConfirmaExcluir OnConfirmar="() => Excluir(l.Id)" /></td></tr>
             }
             </tbody>
         </table>
     </div>
     <div class="cardx">
-        <h2 class="h5">Novo lote</h2>
+        <h2 class="h5">@(editId == 0 ? "Novo lote" : "Editar lote")</h2>
         <p class="hint">Campos com <span class="req"></span> são obrigatórios. A temperatura de armazenamento gera alerta se passar do limite do produto.</p>
         <div class="row g-3">
             <div class="col-12 col-md-6 field"><label class="req" for="e-bio">Produto (bioinsumo)</label>
@@ -37,13 +38,14 @@ else
             <div class="col-6 col-md-3 field"><label for="e-temp">Temp. armazenamento (°C)</label>
                 <input id="e-temp" type="number" step="any" min="-40" max="60" class="form-control" placeholder="Ex.: 6" @bind="temp" /><div class="hint">Opcional</div></div>
         </div>
-        <div class="form-actions"><button class="btn btn-primary" @onclick="Salvar" disabled="@busy">@(busy ? "Salvando…" : "Adicionar lote")</button></div>
+        <div class="form-actions"><button class="btn btn-primary" @onclick="Salvar" disabled="@busy">@(busy ? "Salvando…" : editId == 0 ? "Adicionar lote" : "Salvar alterações")</button>
+            @if (editId != 0) { <button class="btn btn-link" @onclick="CancelarEdicao">Cancelar edição</button> }</div>
         <FormMsg Texto="@msg" Ok="@msgOk" />
     </div>
 }
 @code {
     List<LoteEstoqueDto> lotes = new(); List<BioinsumoDto> bios = new(); Dictionary<string, string> erros = new();
-    int bioId; string lote = "", un = "L", msg = ""; bool msgOk, busy; double qtd; double? temp; DateTime validade = DateTime.Today.AddMonths(6);
+    int bioId, editId; string lote = "", un = "L", msg = ""; bool msgOk, busy; double qtd; double? temp; DateTime validade = DateTime.Today.AddMonths(6);
     MarkupString Err(string k) => erros.TryGetValue(k, out var m) ? new MarkupString($"<div class='field-err'>{m}</div>") : default;
     string Inv(string k) => erros.ContainsKey(k) ? "invalid" : "";
     protected override async Task OnInitializedAsync()
@@ -52,6 +54,14 @@ else
         catch { msg = "Sem conexão."; }
     }
     async Task Carregar() { if (S.PropriedadeId > 0) lotes = await Http.GetFromJsonAsync<List<LoteEstoqueDto>>($"api/propriedades/{S.PropriedadeId}/estoque") ?? new(); }
+    void Editar(LoteEstoqueDto l) { editId = l.Id; bioId = l.BioinsumoId; lote = l.Lote; qtd = l.Quantidade; un = l.Unidade; validade = l.Validade; temp = l.TempArmazenamentoC; erros.Clear(); msg = ""; }
+    void CancelarEdicao() { editId = 0; lote = ""; qtd = 0; temp = null; msg = ""; }
+    async Task Excluir(int id)
+    {
+        var r = await Http.DeleteAsync($"api/propriedades/{S.PropriedadeId}/estoque/{id}");
+        msgOk = r.IsSuccessStatusCode; msg = msgOk ? "Lote excluído." : await Forms.ErroAsync(r, "Não foi possível excluir");
+        if (msgOk) await Carregar();
+    }
     async Task Salvar()
     {
         erros.Clear();
@@ -62,10 +72,11 @@ else
         busy = true;
         try
         {
-            var r = await Http.PostAsJsonAsync($"api/propriedades/{S.PropriedadeId}/estoque", new LoteEstoqueRequest(bioId, lote.Trim(), qtd, un, validade, temp));
+            var req = new LoteEstoqueRequest(bioId, lote.Trim(), qtd, un, validade, temp);
+            var r = editId == 0 ? await Http.PostAsJsonAsync($"api/propriedades/{S.PropriedadeId}/estoque", req) : await Http.PutAsJsonAsync($"api/propriedades/{S.PropriedadeId}/estoque/{editId}", req);
             msgOk = r.IsSuccessStatusCode;
-            msg = msgOk ? "Lote adicionado ao estoque." : await Forms.ErroAsync(r, "Não foi possível salvar o lote");
-            if (msgOk) { lote = ""; qtd = 0; temp = null; await Carregar(); }
+            msg = msgOk ? (editId == 0 ? "Lote adicionado ao estoque." : "Lote atualizado.") : await Forms.ErroAsync(r, "Não foi possível salvar o lote");
+            if (msgOk) { lote = ""; qtd = 0; temp = null; editId = 0; await Carregar(); }
         }
         catch (Exception ex) { msgOk = false; msg = "Falha de conexão: " + ex.Message; }
         finally { busy = false; }

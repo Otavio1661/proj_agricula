@@ -29,6 +29,7 @@ builder.Services.AddHttpClient<IClimaService, ClimaService>(c =>
     c.DefaultRequestHeaders.UserAgent.ParseAdd("AgroCerebro/1.0");
 });
 builder.Services.AddHttpClient<IWhatsAppService, WhatsAppService>(c => c.Timeout = TimeSpan.FromSeconds(20));
+builder.Services.AddHttpClient<IWhatsAppAdminService, WhatsAppAdminService>(c => c.Timeout = TimeSpan.FromSeconds(30));
 builder.Services.AddHostedService<AlertaWorker>();
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<ITokenService, TokenService>();

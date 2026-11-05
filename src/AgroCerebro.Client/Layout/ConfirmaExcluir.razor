@@ -1,0 +1,17 @@
+@* Botão de exclusão com confirmação inline ("Confirmar exclusão?" Sim/Não). *@
+@if (!pedindo)
+{
+    <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => pedindo = true"><i class="fa-solid fa-trash"></i> @Texto</button>
+}
+else
+{
+    <span class="confirma"><span class="small text-danger">Confirmar exclusão?</span>
+        <button type="button" class="btn btn-sm btn-danger" @onclick="Sim">Sim</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => pedindo = false">Não</button></span>
+}
+@code {
+    [Parameter] public string Texto { get; set; } = "Excluir";
+    [Parameter] public EventCallback OnConfirmar { get; set; }
+    bool pedindo;
+    async Task Sim() { pedindo = false; await OnConfirmar.InvokeAsync(); }
+}

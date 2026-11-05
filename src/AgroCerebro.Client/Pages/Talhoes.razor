@@ -22,7 +22,7 @@ else
                 <button class="btn btn-sm btn-outline-success" @onclick="() => Abrir(t, 'p')">Plantio/BBCH</button>
                 <button class="btn btn-sm btn-outline-warning" @onclick="() => Abrir(t, 'o')"><i class="fa-solid fa-bug"></i> Praga</button>
                 <button class="btn btn-sm btn-outline-secondary" @onclick="() => Abrir(t, 'e')">Editar</button>
-                <button class="btn btn-sm btn-outline-danger" @onclick="() => Excluir(t.Id)">Excluir</button>
+                <ConfirmaExcluir OnConfirmar="() => Excluir(t.Id)" />
             </div>
         </div>
     }
@@ -42,9 +42,20 @@ else
             </div>
             <div class="form-actions">
                 <button class="btn btn-primary" @onclick="SalvarPlantio" disabled="@busy">@(busy ? "Salvando…" : "Salvar plantio")</button>
-                @if (sel.PlantioAtivo != null) { <button class="btn btn-outline-success" @onclick="Monitorar" disabled="@busy">Registrar monitoramento (BBCH @bbch)</button> }
+                @if (sel.PlantioAtivo != null)
+                {
+                    <button class="btn btn-outline-success" @onclick="Monitorar" disabled="@busy">Registrar monitoramento (BBCH @bbch)</button>
+                    <button class="btn btn-outline-secondary" @onclick="AtualizarPlantioAtivo" disabled="@busy">Atualizar este plantio</button>
+                    <button class="btn btn-outline-secondary" @onclick="EncerrarCiclo" disabled="@busy">Encerrar ciclo</button>
+                    <ConfirmaExcluir Texto="Excluir plantio" OnConfirmar="ExcluirPlantio" />
+                }
             </div>
             <FormMsg Texto="@msg" Ok="@msgOk" />
+            @if (monits.Count > 0)
+            {
+                <h3 class="h6 mt-3">Histórico de monitoramento</h3>
+                <ul class="list-unstyled small">@foreach (var m in monits) { <li class="d-flex gap-2 align-items-center mb-1">@m.Data.ToLocalTime().ToString("dd/MM/yyyy HH:mm") – BBCH @m.Bbch @m.Notas <ConfirmaExcluir Texto="" OnConfirmar="() => ExcluirMonit(m.Id)" /></li> }</ul>
+            }
         </div>
     }
     @if (sel != null && modo == 'o')
@@ -59,9 +70,12 @@ else
                     <div class="hint">0 = ausente · 3 = moderada · 5 = infestação severa</div></div>
                 <div class="col-12 col-md-3 field"><label for="o-notas">Observações</label><input id="o-notas" class="form-control" placeholder="Ex.: borda do talhão" maxlength="500" @bind="notas" /><div class="hint">Opcional</div></div>
             </div>
-            <div class="form-actions"><button class="btn btn-primary" @onclick="SalvarOcorrencia" disabled="@busy">@(busy ? "Salvando…" : "Registrar ocorrência")</button></div>
+            <div class="form-actions"><button class="btn btn-primary" @onclick="SalvarOcorrencia" disabled="@busy">@(busy ? "Salvando…" : ocEditId == 0 ? "Registrar ocorrência" : "Salvar alterações")</button>
+                @if (ocEditId != 0) { <button class="btn btn-link" @onclick="CancelaOc">Cancelar edição</button> }</div>
             <FormMsg Texto="@msg" Ok="@msgOk" />
-            <ul class="mt-2">@foreach (var o in ocorrencias) { <li>@o.Data.ToLocalTime().ToString("dd/MM") – @o.PragaNome (sev @o.Severidade) @o.Notas</li> }</ul>
+            <ul class="list-unstyled mt-2">@foreach (var o in ocorrencias) { <li class="d-flex gap-2 align-items-center flex-wrap mb-1">@o.Data.ToLocalTime().ToString("dd/MM") – @o.PragaNome (sev @o.Severidade) @o.Notas
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => EditaOc(o)"><i class="fa-solid fa-pen"></i></button>
+                <ConfirmaExcluir Texto="" OnConfirmar="() => ExcluirOc(o.Id)" /></li> }</ul>
         </div>
     }
     @if (modo == 'n' || modo == 'e')
@@ -87,7 +101,7 @@ else
 }
 @code {
     List<TalhaoDto> talhoes = new(); List<CulturaDto> culturas = new(); List<PragaDto> pragas = new(); List<TipoSoloDto> solos = new(); List<OcorrenciaPragaDto> ocorrencias = new();
-    TalhaoDto? sel; char modo = ' '; string nome = "", notas = "", msg = ""; double area; int soloId, culturaId, pragaId, bbch = 10, sev = 1; DateTime dataPlantio = DateTime.Today;
+    TalhaoDto? sel; char modo = ' '; string nome = "", notas = "", msg = ""; double area; int soloId, culturaId, pragaId, bbch = 10, sev = 1, ocEditId; List<MonitoramentoDto> monits = new(); DateTime dataPlantio = DateTime.Today;
 
     Dictionary<string, string> erros = new(); bool msgOk, busy;
     MarkupString Err(string k) => erros.TryGetValue(k, out var m) ? new MarkupString($"<div class='field-err'>{m}</div>") : default;
@@ -111,6 +125,8 @@ else
         sel = t; modo = m;
         if (m == 'p' && t.PlantioAtivo != null) { culturaId = t.PlantioAtivo.CulturaId; bbch = t.PlantioAtivo.BbchAtual; dataPlantio = t.PlantioAtivo.DataPlantio; }
         if (m == 'e') { nome = t.Nome; area = t.AreaHa; soloId = t.TipoSoloId ?? 0; }
+        if (m == 'p' && t.PlantioAtivo != null) monits = await Http.GetFromJsonAsync<List<MonitoramentoDto>>($"api/plantios/{t.PlantioAtivo.Id}/monitoramentos") ?? new(); else monits = new();
+        ocEditId = 0;
         if (m == 'o') ocorrencias = await Http.GetFromJsonAsync<List<OcorrenciaPragaDto>>($"api/talhoes/{t.Id}/ocorrencias") ?? new();
     }
     void Novo() { sel = null; modo = 'n'; nome = ""; area = 0; soloId = 0; erros.Clear(); msg = ""; }
@@ -142,11 +158,31 @@ else
     }
     async Task SalvarOcorrencia()
     {
-        if (await Envia(() => Http.PostAsJsonAsync("api/ocorrencias", new OcorrenciaPragaRequest(sel!.Id, pragaId, sev, null, null, notas)), "Ocorrência registrada.", "Não foi possível registrar"))
+        if (await Envia(() => ocEditId == 0 ? Http.PostAsJsonAsync("api/ocorrencias", new OcorrenciaPragaRequest(sel!.Id, pragaId, sev, null, null, notas)) : Http.PutAsJsonAsync($"api/ocorrencias/{ocEditId}", new OcorrenciaPragaEditarRequest(pragaId, sev, notas)), ocEditId == 0 ? "Ocorrência registrada." : "Ocorrência atualizada.", "Não foi possível salvar"))
         {
-            notas = "";
+            notas = ""; ocEditId = 0;
             ocorrencias = await Http.GetFromJsonAsync<List<OcorrenciaPragaDto>>($"api/talhoes/{sel!.Id}/ocorrencias") ?? new();
         }
+    }
+    void EditaOc(OcorrenciaPragaDto o) { ocEditId = o.Id; pragaId = o.PragaId; sev = o.Severidade; notas = o.Notas ?? ""; msg = ""; }
+    void CancelaOc() { ocEditId = 0; notas = ""; }
+    async Task RecarregaOc() => ocorrencias = await Http.GetFromJsonAsync<List<OcorrenciaPragaDto>>($"api/talhoes/{sel!.Id}/ocorrencias") ?? new();
+    async Task ExcluirOc(int id) { if (await Envia(() => Http.DeleteAsync($"api/ocorrencias/{id}"), "Ocorrência excluída.", "Não foi possível excluir")) await RecarregaOc(); }
+    async Task AtualizarPlantioAtivo()
+    {
+        if (await Envia(() => Http.PutAsJsonAsync($"api/plantios/{sel!.PlantioAtivo!.Id}", new PlantioEditarRequest(culturaId, dataPlantio, bbch, true)), "Plantio atualizado.", "Não foi possível atualizar")) { modo = ' '; await Carregar(); }
+    }
+    async Task EncerrarCiclo()
+    {
+        if (await Envia(() => Http.PutAsJsonAsync($"api/plantios/{sel!.PlantioAtivo!.Id}", new PlantioEditarRequest(sel.PlantioAtivo.CulturaId, sel.PlantioAtivo.DataPlantio, sel.PlantioAtivo.BbchAtual, false)), "Ciclo encerrado.", "Não foi possível encerrar")) { modo = ' '; await Carregar(); }
+    }
+    async Task ExcluirPlantio()
+    {
+        if (await Envia(() => Http.DeleteAsync($"api/plantios/{sel!.PlantioAtivo!.Id}"), "Plantio excluído.", "Não foi possível excluir")) { modo = ' '; await Carregar(); }
+    }
+    async Task ExcluirMonit(int id)
+    {
+        if (await Envia(() => Http.DeleteAsync($"api/monitoramentos/{id}"), "Registro excluído.", "Não foi possível excluir")) monits = await Http.GetFromJsonAsync<List<MonitoramentoDto>>($"api/plantios/{sel!.PlantioAtivo!.Id}/monitoramentos") ?? new();
     }
     async Task Excluir(int id) { await Http.DeleteAsync($"api/talhoes/{id}"); await Carregar(); }
 }

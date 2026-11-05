@@ -219,3 +219,10 @@ public class ContatoWhatsApp
     [MaxLength(20)] public string Numero { get; set; } = ""; // somente dígitos com DDI, ex.: 5511999998888
     public bool Ativo { get; set; } = true;
 }
+
+/// <summary>Configuração chave/valor editável pelo admin (ex.: instância WhatsApp ativa).</summary>
+public class Configuracao
+{
+    [Key, MaxLength(80)] public string Chave { get; set; } = "";
+    [MaxLength(300)] public string? Valor { get; set; }
+}

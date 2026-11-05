@@ -1,5 +1,7 @@
 @page "/whatsapp"
 @inject HttpClient Http
+@inject IJSRuntime JS
+@implements IDisposable
 <PageTitle>WhatsApp</PageTitle>
 <h1 class="h3"><i class="fa-solid fa-comments"></i> Alertas por WhatsApp</h1>
 <p class="text-muted">Cadastre até 3 números para receber os alertas. Formato: DDI + DDD + número (ex.: 5511999998888).</p>
@@ -34,11 +36,117 @@
         @if (Cheio) { <div class="hint mt-1">Limite de @st.Limite números atingido. Remova um para cadastrar outro.</div> }
     </div>
 }
+@if (adm != null)
+{
+    <div class="cardx">
+        <h2 class="h5"><i class="fa-solid fa-qrcode"></i> Administração — conectar números por QR code</h2>
+        <p class="hint">Cada instância é um número de WhatsApp que envia os alertas. Crie uma instância, clique em <strong>Conectar / QR</strong> e leia o código em WhatsApp &gt; Aparelhos conectados no celular do número desejado. Marque a instância como <strong>ativa</strong> para ela ser usada nos envios.</p>
+        @if (!adm.ApiKeyConfigurada)
+        {
+            <div class="alert alert-warning">@adm.Erro<br /><span class="small">Painel da ApiEnvios → API keys → copie a chave e coloque em <code>WhatsApp:ApiKey</code> (appsettings.Development.json ou variável <code>WhatsApp__ApiKey</code>); depois reinicie o servidor.</span></div>
+        }
+        else
+        {
+            @if (adm.Erro != null) { <div class="alert alert-warning">@adm.Erro</div> }
+            @foreach (var i in adm.Instancias)
+            {
+                <div class="cardx d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div><strong>@(i.Nome ?? i.Id)</strong> @if (i.Ativa) { <span class="badge bg-success ms-1">ativa nos envios</span> }
+                        <div class="small text-muted">@i.Provider · <span class="badge @(Conectado(i.Status) ? "bg-success" : "bg-secondary")">@(i.Status ?? "?")</span></div></div>
+                    <div class="d-flex gap-1 flex-wrap">
+                        <button class="btn btn-sm btn-primary" @onclick="() => AbrirQr(i.Id)"><i class="fa-solid fa-qrcode"></i> Conectar / QR</button>
+                        @if (!i.Ativa) { <button class="btn btn-sm btn-outline-success" @onclick="() => Ativar(i.Id)">Usar nos envios</button> }
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => Reconectar(i.Id)" title="Desconecta a sessão atual e gera novo QR">Trocar número</button>
+                        @if (confirmaExcluir == i.Id)
+                        {
+                            <button class="btn btn-sm btn-danger" @onclick="() => Excluir(i.Id)">Confirmar exclusão</button>
+                            <button class="btn btn-sm btn-light" @onclick="() => confirmaExcluir = null">Cancelar</button>
+                        }
+                        else { <button class="btn btn-sm btn-outline-danger" @onclick="() => confirmaExcluir = i.Id">Excluir</button> }
+                    </div>
+                </div>
+            }
+            @if (adm.Instancias.Count == 0) { <p class="text-muted">Nenhuma instância ainda.</p> }
+            @if (qrId != null)
+            {
+                <div class="cardx text-center">
+                    <h3 class="h6">Escaneie com o WhatsApp do número a conectar</h3>
+                    @if (Conectado(qrStatus)) { <div class="alert alert-success"><i class="fa-solid fa-circle-check"></i> Número conectado!</div> }
+                    else if (qrImg != null) { <div>@((MarkupString)qrImg)</div><div class="hint">O código expira em ~1 min e atualiza sozinho. Status: @(qrStatus ?? "aguardando")</div> }
+                    else { <p class="text-muted">Gerando QR code…</p> }
+                    <button class="btn btn-sm btn-outline-secondary mt-2" @onclick="FecharQr">Fechar</button>
+                </div>
+            }
+            <h3 class="h6 mt-3">Nova instância (novo número)</h3>
+            <div class="row g-3 align-items-end">
+                <div class="col-12 col-md-5 field"><label class="req" for="i-nome">Nome</label><input id="i-nome" class="form-control" placeholder="Ex.: Alertas Fazenda Sul" maxlength="60" @bind="novoNome" /></div>
+                <div class="col-12 col-md-4 field"><label for="i-prov">Provedor</label><select id="i-prov" class="form-select" @bind="novoProv"><option>EVOLUTION</option><option>WUZAPI</option></select></div>
+                <div class="col-12 col-md-3 field"><button class="btn btn-primary w-100" @onclick="CriarInstancia" disabled="@busy">Criar instância</button></div>
+            </div>
+        }
+    </div>
+}
 <FormMsg Texto="@msg" Ok="@msgOk" />
 @code {
+    WaAdminStatusDto? adm; string? qrId, qrStatus, qrImg, confirmaExcluir, novoProv = "EVOLUTION"; string novoNome = "";
+    System.Threading.CancellationTokenSource? cts;
+    static bool Conectado(string? s) => s != null && (s.Equals("CONNECTED", StringComparison.OrdinalIgnoreCase) || s.Equals("open", StringComparison.OrdinalIgnoreCase));
+    async Task CarregarAdmin()
+    {
+        try { var r = await Http.GetAsync("api/admin/whatsapp"); if (r.IsSuccessStatusCode) adm = await r.Content.ReadFromJsonAsync<WaAdminStatusDto>(); } catch { }
+    }
+    async Task Msg(HttpResponseMessage r, string ok, string falha) { msgOk = r.IsSuccessStatusCode; msg = msgOk ? ok : await Forms.ErroAsync(r, falha); }
+    async Task CriarInstancia()
+    {
+        if (string.IsNullOrWhiteSpace(novoNome)) { msgOk = false; msg = "Informe o nome da instância."; return; }
+        busy = true;
+        try
+        {
+            var r = await Http.PostAsJsonAsync("api/admin/whatsapp/instancias", new CriarInstanciaWaRequest(novoNome.Trim(), novoProv));
+            await Msg(r, "Instância criada. Clique em Conectar / QR.", "Não foi possível criar");
+            if (r.IsSuccessStatusCode) novoNome = "";
+            await CarregarAdmin();
+        }
+        finally { busy = false; }
+    }
+    async Task AbrirQr(string id)
+    {
+        FecharQr(); qrId = id; qrImg = null; qrStatus = null; cts = new();
+        var r = await Http.PostAsync($"api/admin/whatsapp/instancias/{Uri.EscapeDataString(id)}/conectar", null);
+        if (!r.IsSuccessStatusCode) await Msg(r, "", "Não foi possível iniciar a conexão");
+        _ = PollQr(id, cts.Token);
+    }
+    async Task PollQr(string id, System.Threading.CancellationToken ct)
+    {
+        for (var n = 0; n < 60 && !ct.IsCancellationRequested; n++)
+        {
+            try
+            {
+                var q = await Http.GetFromJsonAsync<QrWaDto>($"api/admin/whatsapp/instancias/{Uri.EscapeDataString(id)}/qr", ct);
+                qrStatus = q?.Status;
+                if (Conectado(qrStatus)) { qrImg = null; await CarregarAdmin(); await InvokeAsync(StateHasChanged); return; }
+                if (!string.IsNullOrWhiteSpace(q?.Qr)) qrImg = await QrHtml(q!.Qr!);
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (OperationCanceledException) { return; }
+            catch { }
+            try { await Task.Delay(4000, ct); } catch (OperationCanceledException) { return; }
+        }
+    }
+    async Task<string> QrHtml(string qr)
+    {
+        if (qr.StartsWith("data:image")) return $"<img alt='QR code' style='max-width:280px;width:100%' src='{qr}' />";
+        if (qr.Length > 200 && !qr.Contains(' ')) return $"<img alt='QR code' style='max-width:280px;width:100%' src='data:image/png;base64,{qr}' />";
+        return await JS.InvokeAsync<string>("agro.qrSvg", qr); // texto do QR: desenhado no navegador, nada sai para terceiros
+    }
+    void FecharQr() { cts?.Cancel(); cts = null; qrId = null; qrImg = null; }
+    async Task Ativar(string id) { var r = await Http.PutAsync($"api/admin/whatsapp/ativa/{Uri.EscapeDataString(id)}", null); await Msg(r, "Instância definida como ativa nos envios.", "Falha"); await CarregarAdmin(); }
+    async Task Reconectar(string id) { var r = await Http.PostAsync($"api/admin/whatsapp/instancias/{Uri.EscapeDataString(id)}/reconectar", null); await Msg(r, "Sessão anterior desconectada. Gerando novo QR…", "Falha ao trocar número"); if (r.IsSuccessStatusCode) await AbrirQr(id); }
+    async Task Excluir(string id) { var r = await Http.DeleteAsync($"api/admin/whatsapp/instancias/{Uri.EscapeDataString(id)}"); confirmaExcluir = null; await Msg(r, "Instância excluída.", "Falha ao excluir"); await CarregarAdmin(); }
+    public void Dispose() => cts?.Cancel();
     WhatsAppStatusDto? st; string nome = "", numero = "", msg = "", erro, erroNome, erroNum; bool msgOk, busy;
     bool Cheio => st != null && st.Numeros.Count >= st.Limite;
-    protected override async Task OnInitializedAsync() => await Carregar();
+    protected override async Task OnInitializedAsync() { await Carregar(); await CarregarAdmin(); }
     async Task Carregar()
     {
         try { st = await Http.GetFromJsonAsync<WhatsAppStatusDto>("api/whatsapp"); }
