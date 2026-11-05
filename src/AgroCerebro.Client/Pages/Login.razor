@@ -1,0 +1,35 @@
+@page "/login"
+@inject HttpClient Http
+@inject Session S
+@inject NavigationManager Nav
+<PageTitle>Entrar – AgroCérebro</PageTitle>
+<div class="auth-box cardx">
+    <h1 class="h3">🌱 AgroCérebro</h1>
+    <p class="text-muted">O cérebro do produtor no campo.</p>
+    <EditForm Model="this" OnSubmit="Enviar">
+        @if (registro) { <div class="mb-2"><label>Nome</label><input class="form-control" @bind="nome" /></div> }
+        <div class="mb-2"><label>E-mail</label><input type="email" class="form-control" @bind="email" /></div>
+        <div class="mb-2"><label>Senha</label><input type="password" class="form-control" @bind="senha" /></div>
+        @if (erro != null) { <div class="alert alert-danger py-1">@erro</div> }
+        <button class="btn btn-primary w-100" disabled="@busy">@(registro ? "Criar conta" : "Entrar")</button>
+    </EditForm>
+    <button class="btn btn-link w-100 mt-2" @onclick="() => registro = !registro">@(registro ? "Já tenho conta" : "Criar nova conta")</button>
+</div>
+@code {
+    bool registro, busy; string nome = "", email = "", senha = ""; string? erro;
+    protected override async Task OnInitializedAsync() { await S.CarregarAsync(); if (S.Autenticado) Nav.NavigateTo("/"); }
+    async Task Enviar()
+    {
+        busy = true; erro = null;
+        try
+        {
+            var r = registro ? await Http.PostAsJsonAsync("api/auth/registrar", new RegistroRequest(nome, email, senha))
+                             : await Http.PostAsJsonAsync("api/auth/login", new LoginRequest(email, senha));
+            if (!r.IsSuccessStatusCode) { erro = registro ? "Não foi possível cadastrar (e-mail já usado?)." : "E-mail ou senha inválidos."; return; }
+            await S.EntrarAsync((await r.Content.ReadFromJsonAsync<AuthResponse>())!);
+            Nav.NavigateTo("/");
+        }
+        catch (Exception ex) { erro = "Falha de conexão: " + ex.Message; }
+        finally { busy = false; }
+    }
+}

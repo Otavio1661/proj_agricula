@@ -1,0 +1,85 @@
+@page "/drone"
+@implements IAsyncDisposable
+@inject HttpClient Http
+@inject Session S
+@inject IJSRuntime JS
+<PageTitle>Drone</PageTitle>
+<h1 class="h3">🚁 Mapeamento por drone</h1>
+<p class="text-muted">Envie ortomosaicos/fotos georreferenciados (JPG/PNG exportados do WebODM, DJI Terra, Pix4D…). Informe os limites (sul, oeste, norte, leste) em graus ou ajuste pelo mapa e use o botão de limites.</p>
+@if (S.PropriedadeId == 0) { <div class="alert alert-info">Selecione uma propriedade.</div> }
+else
+{
+    <div class="cardx">
+        <h2 class="h5">1. Missão</h2>
+        <div class="row g-2">
+            <div class="col-12 col-md-3"><select class="form-select" @bind="talhaoId" @bind:after="CarregarMissoes"><option value="0">Talhão…</option>@foreach (var t in talhoes) { <option value="@t.Id">@t.Nome</option> }</select></div>
+            <div class="col-6 col-md-2"><input type="date" class="form-control" @bind="data" /></div>
+            <div class="col-6 col-md-3"><input class="form-control" placeholder="Equipamento (ex.: DJI Mavic 3M)" @bind="equip" /></div>
+            <div class="col-6 col-md-2"><input type="number" step="any" class="form-control" placeholder="Altura (m)" @bind="altura" /></div>
+            <div class="col-6 col-md-2"><button class="btn btn-primary w-100" @onclick="CriarMissao">Criar missão</button></div>
+        </div>
+    </div>
+    <div class="cardx">
+        <h2 class="h5">2. Imagem</h2>
+        <div class="row g-2">
+            <div class="col-12 col-md-4"><select class="form-select" @bind="missaoId"><option value="0">Missão…</option>@foreach (var m in missoes) { <option value="@m.Id">#@m.Id – @m.Data.ToString("dd/MM/yyyy")</option> }</select></div>
+            <div class="col-6 col-md-2"><select class="form-select" @bind="tipo"><option>RGB</option><option>NDVI</option><option>Multiespectral</option></select></div>
+            <div class="col-6 col-md-2"><input type="number" step="any" class="form-control" placeholder="GSD cm/px" @bind="gsd" /></div>
+            <div class="col-12 col-md-4"><InputFile OnChange="Arquivo" accept="image/*" class="form-control" /></div>
+            <div class="col-3"><input type="number" step="any" class="form-control" placeholder="Sul" @bind="sul" /></div>
+            <div class="col-3"><input type="number" step="any" class="form-control" placeholder="Oeste" @bind="oeste" /></div>
+            <div class="col-3"><input type="number" step="any" class="form-control" placeholder="Norte" @bind="norte" /></div>
+            <div class="col-3"><input type="number" step="any" class="form-control" placeholder="Leste" @bind="leste" /></div>
+        </div>
+        <div class="mt-2 d-flex gap-2"><button class="btn btn-outline-success" @onclick="LimitesDoMapa">📐 Usar limites da vista do mapa</button>
+            <button class="btn btn-primary" @onclick="Enviar">Enviar imagem</button></div>
+        <div id="mapa" class="mapa mt-2" style="height:40vh"></div>
+        @if (msg != null) { <div class="small mt-2">@msg</div> }
+    </div>
+    <h2 class="h5">Imagens da missão</h2>
+    <div class="grid">
+    @foreach (var i in missoes.SelectMany(m => m.Imagens))
+    { <div class="cardx"><img src="@i.Url" style="max-width:100%;max-height:160px" /><div class="small">#@i.Id @i.Tipo @(i.GsdCm != null ? $"· {i.GsdCm} cm/px" : "")</div></div> }
+    </div>
+}
+@code {
+    List<TalhaoDto> talhoes = new(); List<MissaoDroneDto> missoes = new();
+    int talhaoId, missaoId; DateTime data = DateTime.Today; string? equip, msg, tipo = "RGB"; double? altura, gsd; double sul, oeste, norte, leste; IBrowserFile? arq;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { if (S.PropriedadeId > 0) talhoes = await Http.GetFromJsonAsync<List<TalhaoDto>>($"api/propriedades/{S.PropriedadeId}/talhoes") ?? new(); }
+        catch { msg = "Sem conexão."; }
+    }
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (first && S.Propriedade is { } p) await JS.InvokeVoidAsync("mapa.init", "mapa", p.Latitude, p.Longitude);
+    }
+    async Task CarregarMissoes() { missoes = talhaoId == 0 ? new() : await Http.GetFromJsonAsync<List<MissaoDroneDto>>($"api/talhoes/{talhaoId}/missoes") ?? new(); }
+    async Task CriarMissao()
+    {
+        if (talhaoId == 0) { msg = "Escolha um talhão."; return; }
+        var r = await Http.PostAsJsonAsync("api/missoes", new MissaoDroneRequest(talhaoId, data, equip, altura, null));
+        if (r.IsSuccessStatusCode) { var m = await r.Content.ReadFromJsonAsync<MissaoDroneDto>(); missaoId = m!.Id; msg = "Missão criada."; await CarregarMissoes(); }
+        else msg = "Erro ao criar missão.";
+    }
+    async Task LimitesDoMapa() { var b = await JS.InvokeAsync<double[]>("mapa.getBounds"); sul = b[0]; oeste = b[1]; norte = b[2]; leste = b[3]; }
+    void Arquivo(InputFileChangeEventArgs e) => arq = e.File;
+    async Task Enviar()
+    {
+        if (arq == null || missaoId == 0) { msg = "Escolha a missão e o arquivo."; return; }
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        var c = new MultipartFormDataContent();
+        var f = new StreamContent(arq.OpenReadStream(50 * 1024 * 1024));
+        f.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(arq.ContentType);
+        c.Add(f, "arquivo", arq.Name);
+        c.Add(new StringContent(tipo ?? "RGB"), "tipo");
+        c.Add(new StringContent(sul.ToString(inv)), "sul"); c.Add(new StringContent(oeste.ToString(inv)), "oeste");
+        c.Add(new StringContent(norte.ToString(inv)), "norte"); c.Add(new StringContent(leste.ToString(inv)), "leste");
+        if (gsd != null) c.Add(new StringContent(gsd.Value.ToString(inv)), "gsdCm");
+        var r = await Http.PostAsync($"api/missoes/{missaoId}/imagens", c);
+        msg = r.IsSuccessStatusCode ? "Imagem enviada!" : "Falha no envio.";
+        if (r.IsSuccessStatusCode) await CarregarMissoes();
+    }
+    public async ValueTask DisposeAsync() { try { await JS.InvokeVoidAsync("mapa.dispose"); } catch { } }
+}

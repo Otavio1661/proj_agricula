@@ -1,0 +1,29 @@
+@page "/catalogo"
+@inject HttpClient Http
+<PageTitle>Bioinsumos</PageTitle>
+<h1 class="h3">🧪 Catálogo de bioinsumos</h1>
+<p class="text-muted">Requisitos biológicos usados pelo motor de recomendação.</p>
+@if (erro != null) { <div class="alert alert-warning">@erro</div> }
+<div class="table-wrap cardx">
+<table class="table table-sm table-striped">
+    <thead><tr><th>Produto</th><th>Tipo</th><th>Temp (°C)</th><th>UR (%)</th><th>BBCH</th><th>Chuva máx</th><th>Vento máx</th><th>Armazenar até</th><th>Culturas</th><th>Alvos</th></tr></thead>
+    <tbody>
+    @foreach (var b in lista)
+    {
+        <tr><td><strong>@b.Nome</strong><div class="small text-muted">@b.AgenteAtivo</div></td><td>@b.Tipo</td>
+            <td>@b.TempMin–@b.TempMax</td><td>@b.UmidadeMin–@b.UmidadeMax</td><td>@b.BbchMin–@b.BbchMax</td>
+            <td>@b.ChuvaMaxMm mm</td><td>@b.VentoMaxKmh km/h</td>
+            <td>@b.ArmazTempMax °C<div class="small">@b.ArmazInstrucoes</div></td>
+            <td>@string.Join(", ", b.Culturas)</td><td>@string.Join(", ", b.Pragas)</td></tr>
+    }
+    </tbody>
+</table>
+</div>
+@code {
+    List<BioinsumoDto> lista = new(); string? erro;
+    protected override async Task OnInitializedAsync()
+    {
+        try { lista = await Http.GetFromJsonAsync<List<BioinsumoDto>>("api/catalogo/bioinsumos") ?? new(); }
+        catch { erro = "Catálogo indisponível (offline?)."; }
+    }
+}

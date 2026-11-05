@@ -1,0 +1,54 @@
+@page "/whatsapp"
+@inject HttpClient Http
+<PageTitle>WhatsApp</PageTitle>
+<h1 class="h3">💬 Alertas por WhatsApp</h1>
+<p class="text-muted">Cadastre até 3 números para receber os alertas. Formato: DDI + DDD + número (ex.: 5511999998888).</p>
+@if (erro != null) { <div class="alert alert-warning">@erro</div> }
+@if (st != null)
+{
+    @if (!st.Configurado) { <div class="alert alert-info">Envio ainda não configurado no servidor — os números ficam salvos.</div> }
+    <p><strong>@st.Numeros.Count / @st.Limite</strong> números cadastrados</p>
+    @foreach (var n in st.Numeros)
+    {
+        <div class="cardx d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div><strong>@n.Nome</strong><div class="small text-muted">@n.Numero @(n.Ativo ? "" : "(inativo)")</div></div>
+            <div class="d-flex gap-1">
+                <button class="btn btn-sm btn-outline-success" @onclick="() => Testar(n.Id)">Enviar teste</button>
+                <button class="btn btn-sm btn-outline-danger" @onclick="() => Remover(n.Id)">Remover</button>
+            </div>
+        </div>
+    }
+    <div class="cardx">
+        <h2 class="h5">Adicionar número</h2>
+        <div class="row g-2">
+            <div class="col-12 col-md-5"><input class="form-control" placeholder="Nome" @bind="nome" disabled="@Cheio" /></div>
+            <div class="col-8 col-md-5"><input class="form-control" placeholder="5511999998888" inputmode="numeric" @bind="numero" disabled="@Cheio" /></div>
+            <div class="col-4 col-md-2"><button class="btn btn-primary w-100" @onclick="Adicionar" disabled="@Cheio">Adicionar</button></div>
+        </div>
+        @if (Cheio) { <div class="small text-muted mt-1">Limite de @st.Limite números atingido.</div> }
+    </div>
+}
+@if (msg != null) { <div class="small">@msg</div> }
+@code {
+    WhatsAppStatusDto? st; string nome = "", numero = "", msg, erro;
+    bool Cheio => st != null && st.Numeros.Count >= st.Limite;
+    protected override async Task OnInitializedAsync() => await Carregar();
+    async Task Carregar()
+    {
+        try { st = await Http.GetFromJsonAsync<WhatsAppStatusDto>("api/whatsapp"); }
+        catch { erro = "WhatsApp indisponível (offline?)."; }
+    }
+    async Task Adicionar()
+    {
+        var r = await Http.PostAsJsonAsync("api/whatsapp/numeros", new ContatoWhatsAppRequest(nome, numero));
+        msg = r.IsSuccessStatusCode ? "Número adicionado." : "Não foi possível adicionar (número inválido ou limite atingido).";
+        if (r.IsSuccessStatusCode) { nome = numero = ""; }
+        await Carregar();
+    }
+    async Task Remover(int id) { await Http.DeleteAsync($"api/whatsapp/numeros/{id}"); await Carregar(); }
+    async Task Testar(int id)
+    {
+        var r = await Http.PostAsync($"api/whatsapp/numeros/{id}/testar", null);
+        msg = r.IsSuccessStatusCode ? "Mensagem de teste enviada." : "Falha ao enviar o teste.";
+    }
+}

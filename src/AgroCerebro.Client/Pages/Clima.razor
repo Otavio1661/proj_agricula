@@ -1,0 +1,33 @@
+@page "/clima"
+@inject HttpClient Http
+@inject Session S
+<PageTitle>Clima</PageTitle>
+<h1 class="h3">Clima – próximas 72h</h1>
+@if (erro != null) { <div class="alert alert-warning">@erro</div> }
+@if (c != null)
+{
+    <p>Agora: <strong>@c.TemperaturaAtualC.ToString("N1") °C</strong> · 💧 @c.UmidadeAtualPct.ToString("N0")% · 💨 @c.VentoAtualKmh.ToString("N0") km/h <span class="small text-muted">(fonte: @c.Fonte)</span></p>
+    @Chart("🌡️ Temperatura (°C)", c.Horas.Select(h => h.TemperaturaC), 0, 45, "#e65100")
+    @Chart("💧 Umidade relativa (%)", c.Horas.Select(h => h.UmidadePct), 0, 100, "#0277bd")
+    @Chart("🌧️ Chuva (mm/h)", c.Horas.Select(h => h.ChuvaMm), 0, Math.Max(2, c.Horas.Max(h => h.ChuvaMm)), "#1a237e")
+    @Chart("💨 Vento (km/h)", c.Horas.Select(h => h.VentoKmh), 0, Math.Max(20, c.Horas.Max(h => h.VentoKmh)), "#6d4c41")
+}
+@code {
+    ClimaDto? c; string? erro;
+    protected override async Task OnInitializedAsync()
+    {
+        try { if (S.PropriedadeId > 0) c = await Http.GetFromJsonAsync<ClimaDto>($"api/propriedades/{S.PropriedadeId}/clima"); }
+        catch { erro = "Clima indisponível (offline?)."; }
+    }
+    RenderFragment Chart(string titulo, IEnumerable<double> vals, double min, double max, string cor) => __b =>
+    {
+        var l = vals.ToList(); int i = 0;
+        __b.AddMarkupContent(i++, $"<div class='cardx'><strong>{titulo}</strong><div class='bars'>");
+        foreach (var v in l)
+        {
+            var pct = max <= min ? 0 : Math.Clamp((v - min) / (max - min) * 100, 2, 100);
+            __b.AddMarkupContent(i++, $"<div title='{v:N1}' style='height:{pct.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)}%;background:{cor}'></div>");
+        }
+        __b.AddMarkupContent(i++, "</div></div>");
+    };
+}

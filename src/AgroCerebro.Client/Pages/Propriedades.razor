@@ -1,0 +1,75 @@
+@page "/propriedades"
+@inject HttpClient Http
+@inject Session S
+<PageTitle>Fazendas</PageTitle>
+<h1 class="h3">Propriedades</h1>
+<div class="grid">
+@foreach (var x in S.Propriedades)
+{
+    <div class="cardx">
+        <strong>@x.Nome</strong> @if (x.Id == S.PropriedadeId) { <span class="badge bg-success">ativa</span> }
+        <div class="small text-muted">@x.Municipio/@x.Uf · @x.AreaHa.ToString("N1") ha · @x.Latitude.ToString("N4"), @x.Longitude.ToString("N4")</div>
+        <div class="mt-2 d-flex gap-1 flex-wrap">
+            <button class="btn btn-sm btn-outline-success" @onclick="() => S.SelecionarAsync(x.Id)">Usar</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Editar(x)">Editar</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Membros(x.Id)">Equipe</button>
+            <button class="btn btn-sm btn-outline-danger" @onclick="() => Excluir(x.Id)">Excluir</button>
+        </div>
+    </div>
+}
+</div>
+<div class="cardx">
+    <h2 class="h5">@(editId == 0 ? "Nova propriedade" : "Editar propriedade")</h2>
+    <div class="row g-2">
+        <div class="col-12 col-md-6"><input class="form-control" placeholder="Nome" @bind="nome" /></div>
+        <div class="col-8 col-md-4"><input class="form-control" placeholder="Município" @bind="mun" /></div>
+        <div class="col-4 col-md-2"><input class="form-control" placeholder="UF" maxlength="2" @bind="uf" /></div>
+        <div class="col-4"><input type="number" step="any" class="form-control" placeholder="Latitude" @bind="lat" /></div>
+        <div class="col-4"><input type="number" step="any" class="form-control" placeholder="Longitude" @bind="lon" /></div>
+        <div class="col-4"><input type="number" step="any" class="form-control" placeholder="Área (ha)" @bind="area" /></div>
+    </div>
+    <div class="mt-2 d-flex gap-2">
+        <button class="btn btn-primary" @onclick="Salvar">Salvar</button>
+        <button class="btn btn-outline-secondary" @onclick="GPS">📍 Usar minha localização</button>
+        @if (editId != 0) { <button class="btn btn-link" @onclick="Limpar">Cancelar</button> }
+    </div>
+    @if (msg != null) { <div class="small mt-2">@msg</div> }
+</div>
+@if (membros != null)
+{
+    <div class="cardx">
+        <h2 class="h5">Equipe</h2>
+        <ul>@foreach (var m in membros) { <li>@m.Nome (@m.Email) – @m.Papel</li> }</ul>
+        <div class="d-flex gap-2 flex-wrap">
+            <input class="form-control w-auto" placeholder="E-mail do usuário" @bind="convEmail" />
+            <select class="form-select w-auto" @bind="convPapel"><option>Agronomo</option><option>Operador</option></select>
+            <button class="btn btn-primary" @onclick="Convidar">Adicionar</button>
+        </div>
+    </div>
+}
+@code {
+    int editId, membrosId; string nome = "", mun = "", uf = "", convEmail = "", convPapel = "Operador", msg;
+    double lat, lon, area; List<MembroDto>? membros;
+    [Inject] IJSRuntime JS { get; set; } = default!;
+    void Editar(PropriedadeDto x) { editId = x.Id; nome = x.Nome; mun = x.Municipio ?? ""; uf = x.Uf ?? ""; lat = x.Latitude; lon = x.Longitude; area = x.AreaHa; }
+    void Limpar() { editId = 0; nome = mun = uf = ""; lat = lon = area = 0; }
+    async Task Salvar()
+    {
+        var req = new PropriedadeSalvarRequest(nome, mun, uf, lat, lon, area);
+        var r = editId == 0 ? await Http.PostAsJsonAsync("api/propriedades", req) : await Http.PutAsJsonAsync($"api/propriedades/{editId}", req);
+        msg = r.IsSuccessStatusCode ? "Salvo!" : "Erro ao salvar.";
+        if (r.IsSuccessStatusCode) { Limpar(); await S.RecarregarPropriedadesAsync(); }
+    }
+    async Task GPS()
+    {
+        try { var p = await JS.InvokeAsync<double[]>("agro.gps"); lat = p[0]; lon = p[1]; } catch { msg = "Localização indisponível."; }
+    }
+    async Task Excluir(int id) { await Http.DeleteAsync($"api/propriedades/{id}"); await S.RecarregarPropriedadesAsync(); }
+    async Task Membros(int id) { membrosId = id; membros = await Http.GetFromJsonAsync<List<MembroDto>>($"api/propriedades/{id}/membros"); }
+    async Task Convidar()
+    {
+        var r = await Http.PostAsJsonAsync($"api/propriedades/{membrosId}/membros", new ConvidarMembroRequest(convEmail, convPapel));
+        msg = r.IsSuccessStatusCode ? "Membro adicionado." : "Usuário não encontrado ou sem permissão.";
+        await Membros(membrosId);
+    }
+}

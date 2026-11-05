@@ -1,0 +1,35 @@
+/* ===== AgroCérebro theme ===== */
+:root { --verde:#2e7d32; --verde-esc:#1b5e20; --verde-cl:#e8f5e9; --terra:#8d6e63; --bg:#f4f8f1; }
+body { background: var(--bg); }
+a, .btn-link { color: var(--verde); }
+.btn-primary { background: var(--verde); border-color: var(--verde-esc); }
+.btn-primary:hover { background: var(--verde-esc); }
+.app-shell { display:flex; min-height:100vh; }
+.side { width:230px; background:var(--verde-esc); color:#fff; padding:1rem .5rem; position:sticky; top:0; height:100vh; flex-shrink:0; overflow-y:auto; }
+.side .brand { font-weight:700; font-size:1.25rem; padding:.25rem .75rem 1rem; }
+.side a { display:block; color:#e8f5e9; padding:.55rem .75rem; border-radius:8px; text-decoration:none; margin-bottom:2px; }
+.side a.active, .side a:hover { background:rgba(255,255,255,.18); color:#fff; }
+.main { flex:1; min-width:0; display:flex; flex-direction:column; }
+.topbar { display:flex; gap:.75rem; align-items:center; padding:.6rem 1rem; background:#fff; border-bottom:1px solid #dde5d8; position:sticky; top:0; z-index:500; }
+.topbar select { max-width:230px; }
+.content { padding:1rem; padding-bottom:5rem; max-width:1200px; width:100%; }
+.tabbar { display:none; }
+.dot { width:10px; height:10px; border-radius:50%; display:inline-block; background:#2e7d32; }
+.dot.off { background:#c62828; }
+.cardx { background:#fff; border-radius:12px; padding:1rem; box-shadow:0 1px 4px rgba(0,0,0,.08); margin-bottom:1rem; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:1rem; }
+.stat { font-size:1.8rem; font-weight:700; color:var(--verde-esc); }
+.badge-ideal { background:#2e7d32; } .badge-aguardar { background:#f9a825; color:#222 !important; } .badge-inadequado { background:#c62828; }
+.nivel-Critico { border-left:5px solid #c62828; } .nivel-Atencao { border-left:5px solid #f9a825; } .nivel-Info { border-left:5px solid #1976d2; }
+.mapa { height:60vh; min-height:340px; border-radius:12px; z-index:0; }
+.bars { display:flex; align-items:flex-end; gap:2px; height:110px; overflow-x:auto; }
+.bars div { flex:0 0 9px; border-radius:2px 2px 0 0; }
+.auth-box { max-width:400px; margin:8vh auto; }
+.table-wrap { overflow-x:auto; }
+@media (max-width: 768px) {
+  .side { display:none; }
+  .tabbar { display:flex; position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid #cfd8c9; z-index:900; overflow-x:auto; }
+  .tabbar a { flex:1 0 62px; text-align:center; padding:.45rem .2rem; font-size:.7rem; color:#555; text-decoration:none; }
+  .tabbar a span { display:block; font-size:1.25rem; }
+  .tabbar a.active { color:var(--verde); font-weight:700; }
+}

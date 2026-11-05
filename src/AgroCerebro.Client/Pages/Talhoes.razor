@@ -1,0 +1,123 @@
+@page "/talhoes"
+@inject HttpClient Http
+@inject Session S
+<PageTitle>Talhões</PageTitle>
+<h1 class="h3">Talhões</h1>
+@if (S.PropriedadeId == 0) { <div class="alert alert-info">Selecione ou cadastre uma propriedade.</div> }
+else
+{
+    <p><a href="mapa">🗺️ Desenhe o talhão no mapa</a> (área e polígono automáticos) ou cadastre manualmente abaixo.</p>
+    <div class="grid">
+    @foreach (var t in talhoes)
+    {
+        <div class="cardx">
+            <strong>@t.Nome</strong> <span class="small text-muted">@t.AreaHa.ToString("N2") ha · @(t.TipoSoloNome ?? "solo n/i")</span>
+            @if (t.PlantioAtivo is { } pl)
+            {
+                <div>🌱 @pl.CulturaNome — plantio @pl.DataPlantio.ToString("dd/MM/yyyy")</div>
+                <div class="small">BBCH @pl.BbchAtual: @Bbch.Estagio(pl.BbchAtual)</div>
+            }
+            else { <div class="text-muted small">Sem plantio ativo</div> }
+            <div class="mt-2 d-flex gap-1 flex-wrap">
+                <button class="btn btn-sm btn-outline-success" @onclick="() => Abrir(t, 'p')">Plantio/BBCH</button>
+                <button class="btn btn-sm btn-outline-warning" @onclick="() => Abrir(t, 'o')">🐛 Praga</button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => Abrir(t, 'e')">Editar</button>
+                <button class="btn btn-sm btn-outline-danger" @onclick="() => Excluir(t.Id)">Excluir</button>
+            </div>
+        </div>
+    }
+    </div>
+
+    @if (sel != null && modo == 'p')
+    {
+        <div class="cardx">
+            <h2 class="h5">Plantio / estágio – @sel.Nome</h2>
+            <div class="row g-2">
+                <div class="col-12 col-md-4"><label>Cultura</label>
+                    <select class="form-select" @bind="culturaId">@foreach (var c in culturas) { <option value="@c.Id">@c.Nome</option> }</select></div>
+                <div class="col-12 col-md-4"><label>Data do plantio</label><input type="date" class="form-control" @bind="dataPlantio" /></div>
+                <div class="col-12 col-md-4"><label>BBCH: <strong>@bbch</strong> – @Bbch.Estagio(bbch)</label>
+                    <input type="range" min="0" max="99" class="form-range" @bind="bbch" @bind:event="oninput" /></div>
+            </div>
+            <button class="btn btn-primary mt-2" @onclick="SalvarPlantio">Salvar plantio</button>
+            @if (sel.PlantioAtivo != null) { <button class="btn btn-outline-success mt-2" @onclick="Monitorar">Registrar monitoramento (BBCH @bbch)</button> }
+        </div>
+    }
+    @if (sel != null && modo == 'o')
+    {
+        <div class="cardx">
+            <h2 class="h5">Ocorrência de praga – @sel.Nome</h2>
+            <div class="row g-2">
+                <div class="col-12 col-md-5"><select class="form-select" @bind="pragaId">@foreach (var g in pragas) { <option value="@g.Id">@g.Nome (@g.Tipo)</option> }</select></div>
+                <div class="col-12 col-md-4"><label>Severidade: @sev/5</label><input type="range" min="0" max="5" class="form-range" @bind="sev" @bind:event="oninput" /></div>
+                <div class="col-12 col-md-3"><input class="form-control" placeholder="Notas" @bind="notas" /></div>
+            </div>
+            <button class="btn btn-primary mt-2" @onclick="SalvarOcorrencia">Registrar</button>
+            <ul class="mt-2">@foreach (var o in ocorrencias) { <li>@o.Data.ToLocalTime().ToString("dd/MM") – @o.PragaNome (sev @o.Severidade) @o.Notas</li> }</ul>
+        </div>
+    }
+    @if (modo == 'n' || modo == 'e')
+    {
+        <div class="cardx">
+            <h2 class="h5">@(modo == 'e' ? "Editar talhão" : "Novo talhão")</h2>
+            <div class="row g-2">
+                <div class="col-12 col-md-5"><input class="form-control" placeholder="Nome" @bind="nome" /></div>
+                <div class="col-6 col-md-3"><input type="number" step="any" class="form-control" placeholder="Área (ha)" @bind="area" /></div>
+                <div class="col-6 col-md-4"><select class="form-select" @bind="soloId"><option value="0">Solo…</option>@foreach (var s in solos) { <option value="@s.Id">@s.Nome</option> }</select></div>
+            </div>
+            <button class="btn btn-primary mt-2" @onclick="SalvarTalhao">Salvar</button>
+        </div>
+    }
+    else { <button class="btn btn-primary" @onclick="Novo">+ Novo talhão</button> }
+    @if (msg != null) { <div class="small mt-2">@msg</div> }
+}
+@code {
+    List<TalhaoDto> talhoes = new(); List<CulturaDto> culturas = new(); List<PragaDto> pragas = new(); List<TipoSoloDto> solos = new(); List<OcorrenciaPragaDto> ocorrencias = new();
+    TalhaoDto? sel; char modo = ' '; string nome = "", notas = "", msg; double area; int soloId, culturaId, pragaId, bbch = 10, sev = 1; DateTime dataPlantio = DateTime.Today;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            culturas = await Http.GetFromJsonAsync<List<CulturaDto>>("api/catalogo/culturas") ?? new();
+            pragas = await Http.GetFromJsonAsync<List<PragaDto>>("api/catalogo/pragas") ?? new();
+            solos = await Http.GetFromJsonAsync<List<TipoSoloDto>>("api/catalogo/solos") ?? new();
+            if (culturas.Count > 0) culturaId = culturas[0].Id;
+            if (pragas.Count > 0) pragaId = pragas[0].Id;
+            await Carregar();
+        }
+        catch { msg = "Sem conexão com o servidor."; }
+    }
+    async Task Carregar() { if (S.PropriedadeId > 0) talhoes = await Http.GetFromJsonAsync<List<TalhaoDto>>($"api/propriedades/{S.PropriedadeId}/talhoes") ?? new(); }
+    async Task Abrir(TalhaoDto t, char m)
+    {
+        sel = t; modo = m;
+        if (m == 'p' && t.PlantioAtivo != null) { culturaId = t.PlantioAtivo.CulturaId; bbch = t.PlantioAtivo.BbchAtual; dataPlantio = t.PlantioAtivo.DataPlantio; }
+        if (m == 'e') { nome = t.Nome; area = t.AreaHa; soloId = t.TipoSoloId ?? 0; }
+        if (m == 'o') ocorrencias = await Http.GetFromJsonAsync<List<OcorrenciaPragaDto>>($"api/talhoes/{t.Id}/ocorrencias") ?? new();
+    }
+    void Novo() { sel = null; modo = 'n'; nome = ""; area = 0; soloId = 0; }
+    async Task SalvarTalhao()
+    {
+        var req = new TalhaoSalvarRequest(nome, area, sel?.GeoJson, soloId == 0 ? null : soloId);
+        var r = modo == 'e' ? await Http.PutAsJsonAsync($"api/talhoes/{sel!.Id}", req) : await Http.PostAsJsonAsync($"api/propriedades/{S.PropriedadeId}/talhoes", req);
+        msg = r.IsSuccessStatusCode ? "Talhão salvo." : "Erro ao salvar."; modo = ' '; await Carregar();
+    }
+    async Task SalvarPlantio()
+    {
+        var r = await Http.PostAsJsonAsync($"api/talhoes/{sel!.Id}/plantio", new PlantioSalvarRequest(culturaId, dataPlantio, bbch));
+        msg = r.IsSuccessStatusCode ? "Plantio salvo." : "Erro ao salvar plantio."; modo = ' '; await Carregar();
+    }
+    async Task Monitorar()
+    {
+        var r = await Http.PostAsJsonAsync("api/monitoramentos", new MonitoramentoRequest(sel!.PlantioAtivo!.Id, bbch, null));
+        msg = r.IsSuccessStatusCode ? "Monitoramento registrado." : "Erro."; modo = ' '; await Carregar();
+    }
+    async Task SalvarOcorrencia()
+    {
+        var r = await Http.PostAsJsonAsync("api/ocorrencias", new OcorrenciaPragaRequest(sel!.Id, pragaId, sev, null, null, notas));
+        msg = r.IsSuccessStatusCode ? "Ocorrência registrada." : "Erro."; notas = "";
+        ocorrencias = await Http.GetFromJsonAsync<List<OcorrenciaPragaDto>>($"api/talhoes/{sel.Id}/ocorrencias") ?? new();
+    }
+    async Task Excluir(int id) { await Http.DeleteAsync($"api/talhoes/{id}"); await Carregar(); }
+}

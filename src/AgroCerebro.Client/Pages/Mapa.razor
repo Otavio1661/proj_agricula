@@ -1,0 +1,90 @@
+@page "/mapa"
+@implements IAsyncDisposable
+@inject HttpClient Http
+@inject Session S
+@inject IJSRuntime JS
+<PageTitle>Mapa</PageTitle>
+<h1 class="h3">Mapa da propriedade</h1>
+<div class="d-flex gap-2 flex-wrap mb-2 align-items-center">
+    @if (!desenhando) { <button class="btn btn-primary btn-sm" @onclick="Iniciar">✏️ Desenhar talhão</button> }
+    else
+    {
+        <button class="btn btn-success btn-sm" @onclick="Concluir">✔ Concluir</button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick='() => JS.InvokeVoidAsync("mapa.undo")'>↩ Desfazer ponto</button>
+        <button class="btn btn-outline-danger btn-sm" @onclick="Cancelar">Cancelar</button>
+        <span class="small">Toque no mapa para marcar os vértices.</span>
+    }
+</div>
+@if (novo != null)
+{
+    <div class="cardx">
+        <strong>Novo talhão</strong> – área calculada: @novo.Value.areaHa.ToString("N2") ha
+        <div class="d-flex gap-2 mt-2"><input class="form-control" placeholder="Nome do talhão" @bind="nome" />
+            <button class="btn btn-primary" @onclick="SalvarNovo">Salvar</button></div>
+    </div>
+}
+<div id="mapa" class="mapa"></div>
+@if (imagens.Count > 0)
+{
+    <div class="cardx mt-2">
+        <strong>Imagens de drone</strong>
+        @foreach (var i in imagens)
+        {
+            <div class="d-flex gap-2 align-items-center flex-wrap small mt-1">
+                <span>#@i.Id (@i.Tipo)</span>
+                <input type="range" min="0" max="1" step="0.05" value="0.8" @oninput="e => Opac(i.Id, e)" />
+                <label><input type="checkbox" @onchange="e => Vari(i.Id, e)" /> Índice de vegetação (VARI)</label>
+            </div>
+        }
+    </div>
+}
+@if (msg != null) { <div class="small">@msg</div> }
+@code {
+    List<TalhaoDto> talhoes = new(); List<ImagemDroneDto> imagens = new();
+    bool desenhando; (string geoJson, double areaHa)? novo; string nome = "", msg;
+
+    class Res { public string geoJson { get; set; } = ""; public double areaHa { get; set; } }
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (!first) return;
+        var p = S.Propriedade; if (p == null) { msg = "Cadastre uma propriedade primeiro."; StateHasChanged(); return; }
+        await JS.InvokeVoidAsync("mapa.init", "mapa", p.Latitude, p.Longitude);
+        await Recarregar();
+    }
+    async Task Recarregar()
+    {
+        try
+        {
+            talhoes = await Http.GetFromJsonAsync<List<TalhaoDto>>($"api/propriedades/{S.PropriedadeId}/talhoes") ?? new();
+            await JS.InvokeVoidAsync("mapa.setTalhoes", talhoes.Select(t => new { id = t.Id, nome = t.Nome, geoJson = t.GeoJson }));
+            imagens.Clear();
+            foreach (var t in talhoes)
+            {
+                var ms = await Http.GetFromJsonAsync<List<MissaoDroneDto>>($"api/talhoes/{t.Id}/missoes") ?? new();
+                imagens.AddRange(ms.SelectMany(m => m.Imagens));
+            }
+            foreach (var i in imagens)
+                await JS.InvokeVoidAsync("mapa.addOverlay", i.Id, i.Url, new[] { i.Sul, i.Oeste, i.Norte, i.Leste }, i.Tipo);
+            StateHasChanged();
+        }
+        catch { msg = "Dados do mapa indisponíveis (offline?)."; StateHasChanged(); }
+    }
+    async Task Iniciar() { desenhando = true; novo = null; await JS.InvokeVoidAsync("mapa.startDraw"); }
+    async Task Cancelar() { desenhando = false; await JS.InvokeVoidAsync("mapa.cancelDraw"); }
+    async Task Concluir()
+    {
+        desenhando = false;
+        var r = await JS.InvokeAsync<Res?>("mapa.finishDraw");
+        if (r == null) { msg = "Marque ao menos 3 pontos."; return; }
+        novo = (r.geoJson, r.areaHa); nome = $"Talhão {talhoes.Count + 1}";
+    }
+    async Task SalvarNovo()
+    {
+        var r = await Http.PostAsJsonAsync($"api/propriedades/{S.PropriedadeId}/talhoes", new TalhaoSalvarRequest(nome, novo!.Value.areaHa, novo.Value.geoJson, null));
+        msg = r.IsSuccessStatusCode ? "Talhão salvo." : "Erro ao salvar."; novo = null; await Recarregar();
+    }
+    async Task Opac(int id, ChangeEventArgs e) => await JS.InvokeVoidAsync("mapa.setOpacity", id, double.Parse(e.Value!.ToString()!, System.Globalization.CultureInfo.InvariantCulture));
+    async Task Vari(int id, ChangeEventArgs e) => await JS.InvokeVoidAsync("mapa.setVari", id, (bool)e.Value!);
+    public async ValueTask DisposeAsync() { try { await JS.InvokeVoidAsync("mapa.dispose"); } catch { } }
+}

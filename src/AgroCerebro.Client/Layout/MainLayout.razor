@@ -1,0 +1,67 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject Session S
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+@if (!S.Carregado) { <p class="p-3">Carregando…</p> }
+else if (Nav.Uri.Contains("/login")) { @Body }
+else if (S.Autenticado)
+{
+    <div class="app-shell">
+        <nav class="side">
+            <div class="brand">🌱 AgroCérebro</div>
+            @foreach (var (href, ico, nome) in Itens)
+            { <NavLink href="@href" Match="@(href=="" ? NavLinkMatch.All : NavLinkMatch.Prefix)">@ico @nome</NavLink> }
+        </nav>
+        <div class="main">
+            <div class="topbar">
+                <strong class="d-md-none">🌱</strong>
+                <select class="form-select form-select-sm" value="@S.PropriedadeId" @onchange="Troca">
+                    @if (S.Propriedades.Count == 0) { <option value="0">Sem propriedade</option> }
+                    @foreach (var p in S.Propriedades) { <option value="@p.Id">@p.Nome</option> }
+                </select>
+                <span class="ms-auto small"><span class="dot @(online ? "" : "off")"></span> @(online ? "Online" : "Offline")</span>
+                <span class="small d-none d-md-inline">@S.Usuario?.Nome</span>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="Sair">Sair</button>
+            </div>
+            <div class="content" @key="S.PropriedadeId">@Body</div>
+        </div>
+        <nav class="tabbar">
+            @foreach (var (href, ico, nome) in Itens)
+            { <NavLink href="@href" Match="@(href=="" ? NavLinkMatch.All : NavLinkMatch.Prefix)"><span>@ico</span>@nome</NavLink> }
+        </nav>
+    </div>
+}
+else { <p class="p-3">Redirecionando…</p> }
+
+@code {
+    bool online = true;
+    static readonly (string, string, string)[] Itens = {
+        ("", "🏠", "Painel"), ("mapa", "🗺️", "Mapa"), ("talhoes", "🌾", "Talhões"), ("recomendacoes", "🧠", "Recomend."),
+        ("clima", "⛅", "Clima"), ("alertas", "🔔", "Alertas"), ("estoque", "📦", "Estoque"), ("whatsapp", "💬", "WhatsApp"), ("drone", "🚁", "Drone"),
+        ("catalogo", "🧪", "Bioinsumos"), ("propriedades", "🏡", "Fazendas") };
+
+    protected override async Task OnInitializedAsync()
+    {
+        S.Mudou += Refresh;
+        await S.CarregarAsync();
+        Guard();
+    }
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (first)
+        {
+            online = await JS.InvokeAsync<bool>("agro.online");
+            await JS.InvokeVoidAsync("agro.watchOnline", DotNetObjectReference.Create(this));
+            StateHasChanged();
+        }
+    }
+    protected override void OnParametersSet() => Guard();
+    void Guard() { if (S.Carregado && !S.Autenticado && !Nav.Uri.Contains("/login")) Nav.NavigateTo("/login"); }
+    void Refresh() => InvokeAsync(StateHasChanged);
+    [JSInvokable] public void SetOnline(bool v) { online = v; StateHasChanged(); }
+    async Task Troca(ChangeEventArgs e) => await S.SelecionarAsync(int.Parse(e.Value!.ToString()!));
+    async Task Sair() { await S.SairAsync(); Nav.NavigateTo("/login"); }
+    public void Dispose() => S.Mudou -= Refresh;
+}

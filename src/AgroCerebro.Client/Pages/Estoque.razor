@@ -1,0 +1,50 @@
+@page "/estoque"
+@inject HttpClient Http
+@inject Session S
+<PageTitle>Estoque</PageTitle>
+<h1 class="h3">📦 Estoque de bioinsumos</h1>
+@if (S.PropriedadeId == 0) { <div class="alert alert-info">Selecione uma propriedade.</div> }
+else
+{
+    <div class="table-wrap cardx">
+        <table class="table table-sm">
+            <thead><tr><th>Produto</th><th>Lote</th><th>Qtd</th><th>Validade</th><th>Temp. armaz.</th></tr></thead>
+            <tbody>
+            @foreach (var l in lotes)
+            {
+                var venc = l.Validade < DateTime.Today.AddDays(30);
+                <tr><td>@l.BioinsumoNome</td><td>@l.Lote</td><td>@l.Quantidade @l.Unidade</td>
+                    <td class="@(venc ? "text-danger fw-bold" : "")">@l.Validade.ToString("dd/MM/yyyy")</td>
+                    <td>@(l.TempArmazenamentoC?.ToString("N1") ?? "-") °C</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <div class="cardx">
+        <h2 class="h5">Novo lote</h2>
+        <div class="row g-2">
+            <div class="col-12 col-md-4"><select class="form-select" @bind="bioId">@foreach (var b in bios) { <option value="@b.Id">@b.Nome</option> }</select></div>
+            <div class="col-6 col-md-2"><input class="form-control" placeholder="Lote" @bind="lote" /></div>
+            <div class="col-3 col-md-1"><input type="number" step="any" class="form-control" @bind="qtd" /></div>
+            <div class="col-3 col-md-1"><input class="form-control" @bind="un" /></div>
+            <div class="col-6 col-md-2"><input type="date" class="form-control" @bind="validade" /></div>
+            <div class="col-6 col-md-2"><input type="number" step="any" class="form-control" placeholder="°C atual" @bind="temp" /></div>
+        </div>
+        <button class="btn btn-primary mt-2" @onclick="Salvar">Adicionar lote</button> <span class="small">@msg</span>
+    </div>
+}
+@code {
+    List<LoteEstoqueDto> lotes = new(); List<BioinsumoDto> bios = new();
+    int bioId; string lote = "", un = "L", msg = ""; double qtd; double? temp; DateTime validade = DateTime.Today.AddMonths(6);
+    protected override async Task OnInitializedAsync()
+    {
+        try { bios = await Http.GetFromJsonAsync<List<BioinsumoDto>>("api/catalogo/bioinsumos") ?? new(); if (bios.Count > 0) bioId = bios[0].Id; await Carregar(); }
+        catch { msg = "Sem conexão."; }
+    }
+    async Task Carregar() { if (S.PropriedadeId > 0) lotes = await Http.GetFromJsonAsync<List<LoteEstoqueDto>>($"api/propriedades/{S.PropriedadeId}/estoque") ?? new(); }
+    async Task Salvar()
+    {
+        var r = await Http.PostAsJsonAsync($"api/propriedades/{S.PropriedadeId}/estoque", new LoteEstoqueRequest(bioId, lote, qtd, un, validade, temp));
+        msg = r.IsSuccessStatusCode ? "Lote adicionado." : "Erro ao salvar."; await Carregar();
+    }
+}

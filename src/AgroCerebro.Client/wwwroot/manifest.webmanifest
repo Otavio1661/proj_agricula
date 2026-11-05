@@ -1,0 +1,18 @@
+{
+  "name": "AgroCérebro",
+  "short_name": "AgroCérebro",
+  "description": "O cérebro do produtor no campo: clima, bioinsumos e janela perfeita de aplicação.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "lang": "pt-BR",
+  "background_color": "#f4f8f1",
+  "theme_color": "#2e7d32",
+  "prefer_related_applications": false,
+  "icons": [
+    { "src": "icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any maskable" },
+    { "src": "icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any maskable" }
+  ]
+}
