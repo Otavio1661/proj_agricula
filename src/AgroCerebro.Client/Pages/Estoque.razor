@@ -3,6 +3,7 @@
 @inject Session S
 <PageTitle>Estoque</PageTitle>
 <h1 class="h3"><i class="fa-solid fa-boxes-stacked"></i> Estoque de bioinsumos@(Todas ? " — todas as fazendas" : "")</h1>
+<DicaPagina Titulo="Regras do estoque"><ul><li>Informe a <strong>temperatura de armazenamento</strong> do lote: acima do limite do produto gera alerta crítico.</li><li>Lotes que vencem em até 30 dias geram alerta de validade (crítico em 7 dias ou vencido).</li><li>Bioinsumos são organismos vivos: respeite a refrigeração e a validade indicadas no catálogo.</li></ul></DicaPagina>
 @if (S.Propriedades.Count == 0) { <div class="alert alert-info">Cadastre uma propriedade primeiro.</div> }
 else
 {

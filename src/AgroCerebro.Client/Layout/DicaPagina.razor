@@ -1,0 +1,9 @@
+<details class="dica-pagina" open="@Aberta">
+    <summary><i class="fa-solid fa-circle-info"></i> @Titulo</summary>
+    <div class="dica-corpo">@ChildContent</div>
+</details>
+@code {
+    [Parameter] public string Titulo { get; set; } = "Como funciona";
+    [Parameter] public bool Aberta { get; set; } = true;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

@@ -183,3 +183,12 @@ a:hover, .btn-link:hover { text-decoration: underline; }
 .table-striped > tbody > tr:nth-of-type(even) > * { background-color: transparent; }
 .table > tbody > tr:hover > * { background-color: var(--verde-cl); color: var(--text); }
 .table small, .table .text-muted { color: var(--muted) !important; }
+
+/* ===== Observação de regras no topo de cada página ===== */
+.dica-pagina { background: var(--verde-cl); border: 1px solid var(--border-2); border-left: 4px solid var(--verde); border-radius: var(--radius-sm); padding: .55rem .9rem; margin: .4rem 0 1rem; font-size: .88rem; }
+.dica-pagina > summary { cursor: pointer; font-weight: 650; color: var(--verde-esc); list-style: none; }
+.dica-pagina > summary::-webkit-details-marker { display: none; }
+.dica-pagina > summary i { margin-right: 6px; color: var(--verde); }
+.dica-corpo { margin-top: .45rem; color: var(--text); }
+.dica-corpo ul { margin: .25rem 0 0; padding-left: 1.2rem; }
+.dica-corpo li { margin-bottom: .2rem; }

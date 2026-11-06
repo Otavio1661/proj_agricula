@@ -3,6 +3,7 @@
 @inject Session S
 <PageTitle>Fazendas</PageTitle>
 <h1 class="h3">Propriedades</h1>
+<DicaPagina Titulo="Fazendas e equipe"><ul><li>Latitude/longitude definem de onde vem a previsão do tempo (use o botão de localização na fazenda).</li><li><strong>Dono</strong> gerencia equipe e exclui; <strong>Agrônomo</strong> edita dados; <strong>Operador</strong> consulta e registra ocorrências.</li><li>Excluir uma fazenda apaga talhões, estoque e alertas dela.</li></ul></DicaPagina>
 <div class="grid">
 @foreach (var x in S.Propriedades)
 {

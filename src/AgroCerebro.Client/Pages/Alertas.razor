@@ -3,6 +3,7 @@
 @inject Session S
 <PageTitle>Alertas</PageTitle>
 <h1 class="h3"><i class="fa-solid fa-bell"></i> Alertas@(Todas ? " — todas as fazendas" : "")</h1>
+<DicaPagina Titulo="Quando e como os alertas são criados"><ul><li>O servidor avalia todas as fazendas <strong>a cada 30 minutos</strong>; "Avaliar agora" força na hora.</li><li><strong>Janela de aplicação</strong>: há plantio ativo, praga registrada nos últimos 14 dias, produto compatível com cultura e praga, BBCH na faixa e janela ideal em até 6 h.</li><li><strong>Armazenamento</strong>: lote com temperatura acima do limite do produto. <strong>Validade</strong>: lote vence em até 30 dias (crítico em 7 dias).</li><li>Alertas novos vão para o <strong>WhatsApp</strong> dos números ativos (aba WhatsApp). O mesmo aviso não se repete no mesmo dia, e alertas antigos não são reenviados.</li></ul></DicaPagina>
 
 @if (Todas)
 {

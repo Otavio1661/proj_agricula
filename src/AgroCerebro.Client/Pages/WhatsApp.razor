@@ -4,6 +4,7 @@
 @implements IDisposable
 <PageTitle>WhatsApp</PageTitle>
 <h1 class="h3"><i class="fa-solid fa-comments"></i> Alertas por WhatsApp</h1>
+<DicaPagina Titulo="Como receber alertas no WhatsApp"><ul><li>Cadastre até <strong>3 números</strong> (DDI + DDD + número, ex.: 5544999998888) e use <strong>Enviar teste</strong>.</li><li>Cada alerta novo é enviado a todos os números ativos de quem tem acesso à fazenda.</li><li>O envio sai da instância marcada como <strong>ativa</strong> no painel de administração (só o admin gerencia instâncias e QR). Ela precisa ter um número conectado.</li><li>O servidor precisa estar ligado para avaliar e enviar.</li></ul></DicaPagina>
 <p class="text-muted">Cadastre até 3 números para receber os alertas. Formato: DDI + DDD + número (ex.: 5511999998888).</p>
 @if (erro != null) { <div class="alert alert-warning">@erro</div> }
 @if (st != null)

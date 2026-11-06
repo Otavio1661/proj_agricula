@@ -5,6 +5,7 @@
 @inject IJSRuntime JS
 <PageTitle>Mapa</PageTitle>
 <h1 class="h3">@(S.Todas ? "Mapa de todas as fazendas" : "Mapa da propriedade")</h1>
+<DicaPagina Titulo="Como usar o mapa"><ul><li>Clique em <strong>Desenhar talhão</strong>, marque os cantos no mapa e conclua: a área em hectares é calculada sozinha.</li><li>Só é possível desenhar dentro de uma fazenda específica (não em "Todas as fazendas").</li><li>Imagens de drone enviadas na aba Drone aparecem sobrepostas aqui.</li></ul></DicaPagina>
 <FazendaChips />
 @if (S.Todas && cores.Count > 0)
 {

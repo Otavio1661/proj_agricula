@@ -3,6 +3,7 @@
 @inject Session S
 <PageTitle>Recomendações</PageTitle>
 <h1 class="h3"><i class="fa-solid fa-brain"></i> Recomendações de aplicação@(Todas ? " — todas as fazendas" : "")</h1>
+<DicaPagina Titulo="Como a recomendação é calculada"><ul><li>Cruza clima das próximas 72 h, estágio BBCH, pragas registradas (últimos 14 dias) e os requisitos de cada bioinsumo.</li><li><strong>Ideal</strong> = janela começa em até 6 h; <strong>Aguardar</strong> = há janela mais adiante ou nenhuma nas 72 h; <strong>Inadequado</strong> = estágio BBCH fora da faixa do produto.</li><li>Uma janela exige temperatura e umidade na faixa, sem chuva, vento abaixo do limite e, para produtos sensíveis a UV, fora do sol forte (antes das 9 h ou depois das 17 h).</li><li>Valores do catálogo são de referência: confirme sempre na bula do fabricante.</li></ul></DicaPagina>
 <p class="text-muted">Cruzamos clima (72h), estágio BBCH, pragas e os requisitos biológicos de cada bioinsumo.</p>
 
 @if (Todas && lista != null)

@@ -5,6 +5,7 @@
 @inject IJSRuntime JS
 <PageTitle>Drone</PageTitle>
 <h1 class="h3"><i class="fa-solid fa-helicopter"></i> Mapeamento por drone</h1>
+<DicaPagina Titulo="Mapeamento por drone"><ul><li>1) Crie a missão do talhão; 2) envie o ortomosaico (JPG/PNG/WEBP) com os limites sul/oeste/norte/leste.</li><li>A imagem aparece no <strong>Mapa</strong> e permite o filtro de vigor VARI (câmera RGB comum).</li><li>Limites inválidos (norte menor que sul, leste menor que oeste) são recusados.</li></ul></DicaPagina>
 <FazendaChips />
 <p class="text-muted">Envie ortomosaicos/fotos georreferenciados (JPG/PNG exportados do WebODM, DJI Terra, Pix4D…). Informe os limites (sul, oeste, norte, leste) em graus ou ajuste pelo mapa e use o botão de limites.</p>
 @if (S.Todas)

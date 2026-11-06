@@ -3,6 +3,7 @@
 @inject Session S
 <PageTitle>Clima</PageTitle>
 <h1 class="h3">Clima – próximas 72h</h1>
+<DicaPagina Titulo="Sobre os dados de clima"><ul><li>Fonte: Open-Meteo, previsão horária de 72 h para as coordenadas da fazenda (atualiza a cada 30 min).</li><li>Barras mais claras = noite. Passe o mouse (ou toque) na barra para ver o valor da hora.</li><li>Confira a latitude/longitude da fazenda em <strong>Fazendas</strong>: é dela que vem a previsão.</li></ul></DicaPagina>
 <FazendaChips />
 @if (erro != null) { <div class="alert alert-warning">@erro</div> }
 @if (S.Todas)

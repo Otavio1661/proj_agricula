@@ -3,6 +3,7 @@
 @inject Session S
 <PageTitle>Talhões</PageTitle>
 <h1 class="h3">Talhões</h1>
+<DicaPagina Titulo="Regras dos talhões"><ul><li>Para gerar recomendação o talhão precisa de <strong>plantio ativo</strong> (cultura + estágio BBCH) e de uma <strong>praga registrada</strong> (botão Praga).</li><li>Atualize o BBCH conforme a lavoura evolui: cada bioinsumo só vale dentro da sua faixa de estágio.</li><li>Ocorrências de praga valem por <strong>14 dias</strong> para o motor de recomendação.</li></ul></DicaPagina>
 <FazendaChips />
 @if (Pid == 0 && !S.Todas) { <div class="alert alert-info">Selecione ou cadastre uma propriedade.</div> }
 else

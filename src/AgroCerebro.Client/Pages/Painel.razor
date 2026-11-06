@@ -4,6 +4,7 @@
 @inject NavigationManager Nav
 <PageTitle>Painel – AgroCérebro</PageTitle>
 <h1 class="h3">Painel</h1>
+<DicaPagina Titulo="Visão geral das suas fazendas"><ul><li>Cada cartão resume uma fazenda: clima agora, talhões, pragas dos últimos 14 dias, alertas e a próxima janela de aplicação.</li><li><strong>Situação</strong>: <em>Crítico</em> = alerta crítico, lote vencido ou praga severa (nível 4+); <em>Atenção</em> = alerta não lido, praga recente ou lote vencendo em 30 dias; <em>Ok</em> = nada pendente.</li><li>Os alertas são avaliados automaticamente a cada 30 minutos e enviados ao WhatsApp dos números cadastrados.</li></ul></DicaPagina>
 
 @if (carregando)
 {
