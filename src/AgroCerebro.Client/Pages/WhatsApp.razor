@@ -73,6 +73,7 @@
                     <h3 class="h6">Escaneie com o WhatsApp do número a conectar</h3>
                     @if (Conectado(qrStatus)) { <div class="alert alert-success"><i class="fa-solid fa-circle-check"></i> Número conectado!</div> }
                     else if (qrImg != null) { <div>@((MarkupString)qrImg)</div><div class="hint">O código expira em ~1 min e atualiza sozinho. Status: @(qrStatus ?? "aguardando")</div> }
+                    else if (qrTentativas >= 6) { <div class="alert alert-warning text-start">O provedor ainda não devolveu o QR (status: @(qrStatus ?? "?")). Instâncias <strong>WUZAPI</strong> costumam ficar assim neste servidor — exclua esta instância e crie outra com o provedor <strong>EVOLUTION</strong>.</div> }
                     else { <p class="text-muted">Gerando QR code…</p> }
                     <button class="btn btn-sm btn-outline-secondary mt-2" @onclick="FecharQr">Fechar</button>
                 </div>
@@ -80,7 +81,7 @@
             <h3 class="h6 mt-3">Nova instância (novo número)</h3>
             <div class="row g-3 align-items-end">
                 <div class="col-12 col-md-5 field"><label class="req" for="i-nome">Nome</label><input id="i-nome" class="form-control" placeholder="Ex.: Alertas Fazenda Sul" maxlength="60" @bind="novoNome" /></div>
-                <div class="col-12 col-md-4 field"><label for="i-prov">Provedor</label><select id="i-prov" class="form-select" @bind="novoProv"><option>EVOLUTION</option><option>WUZAPI</option></select></div>
+                <div class="col-12 col-md-4 field"><label for="i-prov">Provedor</label><select id="i-prov" class="form-select" @bind="novoProv"><option value="EVOLUTION">EVOLUTION (recomendado — gera QR na hora)</option><option value="WUZAPI">WUZAPI (pode não gerar QR neste servidor)</option></select></div>
                 <div class="col-12 col-md-3 field"><button class="btn btn-primary w-100" @onclick="CriarInstancia" disabled="@busy">Criar instância</button></div>
             </div>
         }
@@ -88,7 +89,7 @@
 }
 <FormMsg Texto="@msg" Ok="@msgOk" />
 @code {
-    WaAdminStatusDto? adm; string? qrId, qrStatus, qrImg, confirmaExcluir, novoProv = "EVOLUTION"; string novoNome = "";
+    WaAdminStatusDto? adm; int qrTentativas; string? qrId, qrStatus, qrImg, confirmaExcluir, novoProv = "EVOLUTION"; string novoNome = "";
     System.Threading.CancellationTokenSource? cts;
     static bool Conectado(string? s) => s != null && (s.Equals("CONNECTED", StringComparison.OrdinalIgnoreCase) || s.Equals("open", StringComparison.OrdinalIgnoreCase));
     async Task CarregarAdmin()
@@ -111,7 +112,7 @@
     }
     async Task AbrirQr(string id)
     {
-        FecharQr(); qrId = id; qrImg = null; qrStatus = null; cts = new();
+        FecharQr(); qrId = id; qrImg = null; qrStatus = null; qrTentativas = 0; cts = new();
         var r = await Http.PostAsync($"api/admin/whatsapp/instancias/{Uri.EscapeDataString(id)}/conectar", null);
         if (!r.IsSuccessStatusCode) await Msg(r, "", "Não foi possível iniciar a conexão");
         _ = PollQr(id, cts.Token);
@@ -123,7 +124,7 @@
             try
             {
                 var q = await Http.GetFromJsonAsync<QrWaDto>($"api/admin/whatsapp/instancias/{Uri.EscapeDataString(id)}/qr", ct);
-                qrStatus = q?.Status;
+                qrStatus = q?.Status; qrTentativas = n + 1;
                 if (Conectado(qrStatus)) { qrImg = null; await CarregarAdmin(); await InvokeAsync(StateHasChanged); return; }
                 if (!string.IsNullOrWhiteSpace(q?.Qr)) qrImg = await QrHtml(q!.Qr!);
                 await InvokeAsync(StateHasChanged);
