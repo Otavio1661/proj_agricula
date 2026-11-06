@@ -42,7 +42,7 @@ public class WhatsAppAdminController(IWhatsAppAdminService wa, IConfiguration cf
                 foreach (var i in arr.EnumerateArray())
                 {
                     var id = Str(i, "id") ?? "";
-                    lista.Add(new InstanciaWaDto(id, Str(i, "name", "nome"), Str(i, "status"), Str(i, "provider"), id == ativa));
+                    lista.Add(new InstanciaWaDto(id, Str(i, "name", "nome"), Str(i, "connectionState", "connection", "status"), Str(i, "provider"), id == ativa));
                 }
         }
         return new WaAdminStatusDto(true, ativa, erro, lista);
@@ -76,12 +76,12 @@ public class WhatsAppAdminController(IWhatsAppAdminService wa, IConfiguration cf
         string? qr = null, status = null;
         if (json is { } j)
         {
-            qr = Str(j, "qr", "qrcode", "base64", "code");
-            status = Str(j, "status");
+            qr = Str(j, "qrCode", "qr", "base64", "code");
+            status = Str(j, "connectionState", "connection");
             if (qr == null && j.ValueKind == JsonValueKind.Object && j.TryGetProperty("data", out var d)) qr = Str(d, "qr", "qrcode", "base64");
         }
         var (_, sj, _) = await wa.ChamarAsync(HttpMethod.Get, $"/v1/instances/{Uri.EscapeDataString(id)}/status", null, ct);
-        if (sj is { } s) status = Str(s, "status", "state") ?? status;
+        if (sj is { } s) status = Str(s, "connectionState", "connection", "status", "state") ?? status;
         if (erro != null && qr == null && status == null) return StatusCode(st, erro);
         return new QrWaDto(qr, status, json?.GetRawText());
     }

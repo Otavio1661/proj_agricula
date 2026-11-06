@@ -3,10 +3,44 @@
 @inject Session S
 <PageTitle>Talhões</PageTitle>
 <h1 class="h3">Talhões</h1>
-@if (S.PropriedadeId == 0) { <div class="alert alert-info">Selecione ou cadastre uma propriedade.</div> }
+<FazendaChips />
+@if (Pid == 0 && !S.Todas) { <div class="alert alert-info">Selecione ou cadastre uma propriedade.</div> }
 else
 {
     <p><a href="mapa"><i class="fa-solid fa-map-location-dot"></i> Desenhe o talhão no mapa</a> (área e polígono automáticos) ou cadastre manualmente abaixo.</p>
+    @if (S.Todas)
+    {
+        <div class="fz-bar">
+            <div class="field"><label for="t-filtro">Filtrar por fazenda</label>
+                <select id="t-filtro" class="form-select" @bind="filtroFaz"><option value="0">Todas as fazendas</option>@foreach (var p in S.Propriedades) { <option value="@p.Id">@p.Nome</option> }</select></div>
+        </div>
+        <div class="fz-table-wrap"><table class="fz-table">
+            <thead><tr><th>Fazenda</th><th>Talhão</th><th class="text-end">Área (ha)</th><th>Solo</th><th>Cultura / estágio</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var g in talhoes.Where(x => filtroFaz == 0 || x.PropriedadeId == filtroFaz).GroupBy(x => x.PropriedadeId))
+            {
+                @foreach (var t in g)
+                {
+                    <tr>
+                        <td><span class="fz-tag"><i class="fa-solid fa-tractor"></i> @S.NomeFazenda(t.PropriedadeId)</span></td>
+                        <td><strong>@t.Nome</strong></td>
+                        <td class="text-end">@t.AreaHa.ToString("N2")</td>
+                        <td>@(t.TipoSoloNome ?? "n/i")</td>
+                        <td>@if (t.PlantioAtivo is { } pl) { <span><i class="fa-solid fa-seedling"></i> @pl.CulturaNome · BBCH @pl.BbchAtual</span> } else { <span class="text-muted small">Sem plantio</span> }</td>
+                        <td><div class="fz-actions">
+                            <button class="btn btn-sm btn-outline-success" @onclick="() => Abrir(t, 'p')">Plantio/BBCH</button>
+                            <button class="btn btn-sm btn-outline-warning" @onclick="() => Abrir(t, 'o')"><i class="fa-solid fa-bug"></i></button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Abrir(t, 'e')"><i class="fa-solid fa-pen"></i></button>
+                            <ConfirmaExcluir OnConfirmar="() => Excluir(t.Id)" /></div></td>
+                    </tr>
+                }
+                <tr class="fz-sub"><td colspan="2">Subtotal – @S.NomeFazenda(g.Key)</td><td class="text-end">@g.Sum(x => x.AreaHa).ToString("N2")</td><td colspan="3">@g.Count() talhão(ões)</td></tr>
+            }
+            <tr class="fz-total"><td colspan="2">Total</td><td class="text-end">@talhoes.Where(x => filtroFaz == 0 || x.PropriedadeId == filtroFaz).Sum(x => x.AreaHa).ToString("N2")</td><td colspan="3">@talhoes.Count(x => filtroFaz == 0 || x.PropriedadeId == filtroFaz) talhão(ões)</td></tr>
+            </tbody></table></div>
+    }
+    else
+    {
     <div class="grid">
     @foreach (var t in talhoes)
     {
@@ -27,6 +61,7 @@ else
         </div>
     }
     </div>
+    }
 
     @if (sel != null && modo == 'p')
     {
@@ -84,6 +119,11 @@ else
             <h2 class="h5">@(modo == 'e' ? "Editar talhão" : "Novo talhão")</h2>
             <p class="hint">Campos com <span class="req"></span> são obrigatórios. Dica: desenhando no mapa a área é calculada sozinha.</p>
             <div class="row g-3">
+                @if (S.Todas && modo == 'n')
+                {
+                    <div class="col-12 field"><label class="req" for="t-faz">Fazenda do talhão</label>
+                        <select id="t-faz" class="form-select" @bind="novaFaz">@foreach (var p in S.Propriedades) { <option value="@p.Id">@p.Nome</option> }</select></div>
+                }
                 <div class="col-12 col-md-5 field"><label class="req" for="t-nome">Nome do talhão</label>
                     <input id="t-nome" class="form-control @Inv("nome")" placeholder="Ex.: Talhão 3 – Soja" maxlength="120" @bind="nome" />@Err("nome")</div>
                 <div class="col-6 col-md-3 field"><label class="req" for="t-area">Área (hectares)</label>
@@ -100,6 +140,8 @@ else
     @if (modo != 'n' && modo != 'e' && modo != 'p' && modo != 'o') { <FormMsg Texto="@msg" Ok="@msgOk" /> }
 }
 @code {
+    int Pid => S.Todas ? -1 : (S.PropriedadeId > 0 ? S.PropriedadeId : S.Propriedades.FirstOrDefault()?.Id ?? 0);
+    int filtroFaz, novaFaz; int FazForm => S.Todas ? novaFaz : Pid;
     List<TalhaoDto> talhoes = new(); List<CulturaDto> culturas = new(); List<PragaDto> pragas = new(); List<TipoSoloDto> solos = new(); List<OcorrenciaPragaDto> ocorrencias = new();
     TalhaoDto? sel; char modo = ' '; string nome = "", notas = "", msg = ""; double area; int soloId, culturaId, pragaId, bbch = 10, sev = 1, ocEditId; List<MonitoramentoDto> monits = new(); DateTime dataPlantio = DateTime.Today;
 
@@ -115,11 +157,16 @@ else
             solos = await Http.GetFromJsonAsync<List<TipoSoloDto>>("api/catalogo/solos") ?? new();
             if (culturas.Count > 0) culturaId = culturas[0].Id;
             if (pragas.Count > 0) pragaId = pragas[0].Id;
+            novaFaz = S.Propriedades.FirstOrDefault()?.Id ?? 0;
             await Carregar();
         }
         catch { msg = "Sem conexão com o servidor."; }
     }
-    async Task Carregar() { if (S.PropriedadeId > 0) talhoes = await Http.GetFromJsonAsync<List<TalhaoDto>>($"api/propriedades/{S.PropriedadeId}/talhoes") ?? new(); }
+    async Task Carregar()
+    {
+        if (S.Todas) talhoes = (await Http.GetFromJsonAsync<List<TalhaoFazendaDto>>("api/todas/talhoes") ?? new()).Select(x => x.Talhao).ToList();
+        else if (Pid > 0) talhoes = await Http.GetFromJsonAsync<List<TalhaoDto>>($"api/propriedades/{Pid}/talhoes") ?? new();
+    }
     async Task Abrir(TalhaoDto t, char m)
     {
         sel = t; modo = m;
@@ -144,7 +191,7 @@ else
         if (area <= 0) erros["area"] = "A área deve ser maior que zero.";
         if (erros.Count > 0) { msgOk = false; msg = "Corrija os campos destacados."; return; }
         var req = new TalhaoSalvarRequest(nome.Trim(), area, sel?.GeoJson, soloId == 0 ? null : soloId);
-        if (await Envia(() => modo == 'e' ? Http.PutAsJsonAsync($"api/talhoes/{sel!.Id}", req) : Http.PostAsJsonAsync($"api/propriedades/{S.PropriedadeId}/talhoes", req), "Talhão salvo.", "Não foi possível salvar o talhão")) { modo = ' '; await Carregar(); }
+        if (await Envia(() => modo == 'e' ? Http.PutAsJsonAsync($"api/talhoes/{sel!.Id}", req) : Http.PostAsJsonAsync($"api/propriedades/{FazForm}/talhoes", req), "Talhão salvo.", "Não foi possível salvar o talhão")) { modo = ' '; await Carregar(); }
     }
     async Task SalvarPlantio()
     {

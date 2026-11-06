@@ -19,6 +19,10 @@ public class Session
     public bool Carregado { get; private set; }
     public bool Autenticado => !string.IsNullOrEmpty(Token);
     public PropriedadeDto? Propriedade => Propriedades.FirstOrDefault(p => p.Id == PropriedadeId);
+    /// <summary>Modo "Todas as fazendas": PropriedadeId == -1. As páginas devem mostrar dados consolidados com a coluna Fazenda.</summary>
+    public const int TodasId = -1;
+    public bool Todas => PropriedadeId == TodasId && Propriedades.Count > 1;
+    public string NomeFazenda(int id) => Propriedades.FirstOrDefault(p => p.Id == id)?.Nome ?? "";
     public event Action? Mudou;
 
     bool? _admin;
@@ -62,7 +66,7 @@ public class Session
     {
         try { Propriedades = await _http.GetFromJsonAsync<List<PropriedadeDto>>("api/propriedades") ?? new(); }
         catch { /* offline */ }
-        if (Propriedades.Count > 0 && Propriedades.All(p => p.Id != PropriedadeId))
+        if (Propriedades.Count > 0 && PropriedadeId != TodasId && Propriedades.All(p => p.Id != PropriedadeId))
             await SelecionarAsync(Propriedades[0].Id);
         else Mudou?.Invoke();
     }

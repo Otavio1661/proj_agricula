@@ -1,0 +1,16 @@
+@inject Session S
+@if (S.Propriedades.Count > 1 && !S.Todas)
+{
+    <div class="fz-chips" aria-label="Outras fazendas">
+        <span class="fz-chips-l">Ver também:</span>
+        @foreach (var p in S.Propriedades.Where(p => p.Id != S.PropriedadeId))
+        {
+            <button type="button" class="fz-chip" @onclick="() => S.SelecionarAsync(p.Id)"><i class="fa-solid fa-tractor"></i> @p.Nome</button>
+        }
+        <button type="button" class="fz-chip fz-chip-all" @onclick="() => S.SelecionarAsync(Session.TodasId)"><i class="fa-solid fa-layer-group"></i> Todas as fazendas</button>
+    </div>
+}
+else if (S.Todas)
+{
+    <div class="fz-chips"><span class="fz-chips-l"><i class="fa-solid fa-layer-group"></i> Visão consolidada de @S.Propriedades.Count fazendas.</span></div>
+}

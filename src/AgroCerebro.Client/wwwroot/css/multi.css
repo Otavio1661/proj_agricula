@@ -1,0 +1,34 @@
+/* ===== Visão multi-fazenda (Talhões, Clima, Mapa, Drone) ===== */
+.fz-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 14px; }
+.fz-chips-l { font-size: .85rem; color: var(--muted, #5f6f5f); }
+.fz-chip { border: 1px solid var(--border, #d5e0d5); background: var(--surface, #fff); color: inherit; border-radius: 999px; padding: 4px 12px; font-size: .85rem; cursor: pointer; transition: background .15s, border-color .15s; }
+.fz-chip:hover { border-color: var(--verde, #2e7d32); background: rgba(46, 125, 50, .08); }
+.fz-chip-all { border-style: dashed; }
+
+.fz-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 10px; }
+.fz-bar .field { min-width: 220px; }
+.fz-table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border, #d5e0d5); background: var(--surface, #fff); }
+.fz-table { width: 100%; border-collapse: collapse; font-size: .9rem; min-width: 720px; }
+.fz-table th { text-align: left; padding: 10px 12px; font-size: .75rem; text-transform: uppercase; letter-spacing: .03em; color: var(--muted, #5f6f5f); background: rgba(46, 125, 50, .06); position: sticky; top: 0; }
+.fz-table td { padding: 9px 12px; border-top: 1px solid var(--border, #e3ebe3); vertical-align: middle; }
+.fz-table tbody tr:hover { background: rgba(46, 125, 50, .05); }
+.fz-table tr.fz-sub td { background: rgba(46, 125, 50, .08); font-weight: 600; }
+.fz-table tr.fz-total td { border-top: 2px solid var(--verde, #2e7d32); font-weight: 700; }
+.fz-tag { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: .75rem; background: rgba(46, 125, 50, .12); }
+.fz-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+
+/* Clima: cards compactos por fazenda */
+.fz-clima-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.fz-clima-card { cursor: pointer; text-align: left; border: 1px solid var(--border, #d5e0d5); background: var(--surface, #fff); color: inherit; border-radius: 14px; padding: 14px 16px; transition: transform .15s, box-shadow .15s; }
+.fz-clima-card:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0, 0, 0, .08); }
+.fz-clima-card h3 { font-size: 1rem; margin: 0 0 6px; }
+.fz-clima-now { font-size: 1.9rem; font-weight: 700; line-height: 1; }
+.fz-clima-meta { display: flex; gap: 12px; flex-wrap: wrap; font-size: .82rem; color: var(--muted, #5f6f5f); margin-top: 6px; }
+.fz-spark { width: 100%; height: 38px; margin-top: 8px; }
+
+/* Mapa: legenda das fazendas */
+.fz-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.fz-legend-item { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--border, #d5e0d5); background: var(--surface, #fff); border-radius: 999px; padding: 4px 6px 4px 12px; font-size: .85rem; }
+.fz-legend-item .sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.fz-legend-item button { border: 0; background: transparent; cursor: pointer; color: inherit; padding: 2px 6px; border-radius: 6px; }
+.fz-legend-item button:hover { background: rgba(46, 125, 50, .12); }

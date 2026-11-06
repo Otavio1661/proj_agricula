@@ -2,14 +2,43 @@
 @inject HttpClient Http
 @inject Session S
 <PageTitle>Alertas</PageTitle>
-<h1 class="h3"><i class="fa-solid fa-bell"></i> Alertas</h1>
-<button class="btn btn-sm btn-primary mb-2" @onclick="Gerar" disabled="@(S.PropriedadeId == 0)">Avaliar agora</button> <button class="btn btn-sm btn-outline-secondary mb-2" @onclick="TodosLidos" disabled="@(S.PropriedadeId == 0 || lista.All(x => x.Lido))">Marcar todos como lidos</button> <span class="small">@msg</span>
-@if (erro != null) { <div class="alert alert-warning">@erro</div> }
-@if (lista.Count == 0 && erro == null) { <p class="text-muted">Sem alertas.</p> }
-@foreach (var a in lista)
+<h1 class="h3"><i class="fa-solid fa-bell"></i> Alertas@(Todas ? " — todas as fazendas" : "")</h1>
+
+@if (Todas)
 {
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+        @foreach (var g in porFazenda)
+        {
+            <button type="button" class="badge @(filtro == g.Key ? "bg-success" : "bg-secondary") border-0" @onclick="() => Alterna(g.Key)"
+                    title="Alertas não lidos nesta fazenda">@g.Key: @g.Value</button>
+        }
+    </div>
+    <div class="field mb-2" style="max-width:320px">
+        <label for="a-faz">Fazenda</label>
+        <select id="a-faz" class="form-select" @bind="filtro">
+            <option value="">Todas as fazendas</option>
+            @foreach (var p in S.Propriedades) { <option value="@p.Nome">@p.Nome</option> }
+        </select>
+    </div>
+}
+else if (outrosNaoLidos > 0)
+{
+    <div class="small text-muted mb-2"><i class="fa-solid fa-circle-info"></i> Há @outrosNaoLidos alerta(s) não lido(s) em outras fazendas — escolha “Todas as fazendas” no topo para ver.</div>
+}
+
+<button class="btn btn-sm btn-primary mb-2" @onclick="Gerar" disabled="@(Ids.Count == 0 || busy)">@(Todas ? "Avaliar todas as fazendas" : "Avaliar agora")</button>
+<button class="btn btn-sm btn-outline-secondary mb-2" @onclick="TodosLidos" disabled="@(Visiveis.All(x => x.Alerta.Lido))">Marcar @(Todas && filtro == "" ? "todos" : "estes") como lidos</button>
+<span class="small">@msg</span>
+@if (erro != null) { <div class="alert alert-warning">@erro</div> }
+@if (!carregando && Visiveis.Count == 0 && erro == null) { <p class="text-muted">Sem alertas.</p> }
+@foreach (var x in Visiveis)
+{
+    var a = x.Alerta;
     <div class="cardx nivel-@a.Nivel" style="@(a.Lido ? "opacity:.6" : "")">
-        <div class="d-flex justify-content-between"><strong>@a.Titulo</strong><span class="small text-muted">@a.Tipo · @a.CriadoEm.ToLocalTime().ToString("g")</span></div>
+        <div class="d-flex justify-content-between gap-2 flex-wrap">
+            <strong>@a.Titulo</strong>
+            <span class="small text-muted">@if (Todas) { <span class="badge bg-light text-dark border me-1"><i class="fa-solid fa-tractor"></i> @x.FazendaNome</span> }@a.Tipo · @a.CriadoEm.ToLocalTime().ToString("g")</span>
+        </div>
         <div>@a.Mensagem</div>
         <div class="d-flex gap-2 flex-wrap mt-1">
             @if (!a.Lido) { <button class="btn btn-sm btn-outline-secondary" @onclick="() => Lido(a.Id)">Marcar como lido</button> }
@@ -18,20 +47,54 @@
     </div>
 }
 @code {
-    List<AlertaDto> lista = new(); string? erro, msg;
-    async Task Gerar()
-    {
-        var r = await Http.PostAsync($"api/propriedades/{S.PropriedadeId}/alertas/gerar", null);
-        msg = r.IsSuccessStatusCode ? $"{await r.Content.ReadAsStringAsync()} novo(s) alerta(s) gerado(s)." : "Falha ao avaliar.";
-        await Carregar();
-    }
+    List<AlertaFazendaDto> todos = new(); string? erro, msg; string filtro = ""; bool carregando = true, busy; int outrosNaoLidos;
+    bool Todas => S.PropriedadeId == Session.TodasId && S.Propriedades.Count > 1;
+    int PidUnico => S.PropriedadeId > 0 ? S.PropriedadeId : (S.Propriedades.FirstOrDefault()?.Id ?? 0);
+    List<int> Ids => Todas ? S.Propriedades.Select(p => p.Id).ToList() : (PidUnico > 0 ? new() { PidUnico } : new());
+    List<AlertaFazendaDto> Visiveis => Todas && filtro != "" ? todos.Where(x => x.FazendaNome == filtro).ToList() : todos;
+    Dictionary<string, int> porFazenda => S.Propriedades.ToDictionary(p => p.Nome, p => todos.Count(x => x.FazendaNome == p.Nome && !x.Alerta.Lido));
+
     protected override async Task OnInitializedAsync() => await Carregar();
     async Task Carregar()
     {
-        try { if (S.PropriedadeId > 0) lista = await Http.GetFromJsonAsync<List<AlertaDto>>($"api/propriedades/{S.PropriedadeId}/alertas") ?? new(); }
+        try
+        {
+            if (Todas) todos = await Http.GetFromJsonAsync<List<AlertaFazendaDto>>("api/todas/alertas") ?? new();
+            else if (PidUnico > 0)
+            {
+                var l = await Http.GetFromJsonAsync<List<AlertaDto>>($"api/propriedades/{PidUnico}/alertas") ?? new();
+                var nome = S.NomeFazenda(PidUnico);
+                todos = l.Select(a => new AlertaFazendaDto(a, nome)).ToList();
+                if (S.Propriedades.Count > 1)
+                {
+                    var tudo = await Http.GetFromJsonAsync<List<AlertaFazendaDto>>("api/todas/alertas") ?? new();
+                    outrosNaoLidos = tudo.Count(x => x.Alerta.PropriedadeId != PidUnico && !x.Alerta.Lido);
+                }
+            }
+        }
         catch { erro = "Alertas indisponíveis (offline?)."; }
+        carregando = false;
     }
-    async Task TodosLidos() { await Http.PostAsync($"api/propriedades/{S.PropriedadeId}/alertas/lidos", null); await Carregar(); }
+    async Task Gerar()
+    {
+        busy = true; var novos = 0; var falhas = 0;
+        foreach (var id in Ids)
+        {
+            var r = await Http.PostAsync($"api/propriedades/{id}/alertas/gerar", null);
+            if (!r.IsSuccessStatusCode) { falhas++; continue; }
+            if (int.TryParse(await r.Content.ReadAsStringAsync(), out var k)) novos += k;
+        }
+        msg = $"{novos} novo(s) alerta(s) gerado(s)." + (falhas > 0 ? $" {falhas} fazenda(s) sem permissão ou sem clima." : "");
+        busy = false;
+        await Carregar();
+    }
+    async Task TodosLidos()
+    {
+        foreach (var pid in Visiveis.Where(x => !x.Alerta.Lido).Select(x => x.Alerta.PropriedadeId).Distinct())
+            await Http.PostAsync($"api/propriedades/{pid}/alertas/lidos", null);
+        await Carregar();
+    }
+    void Alterna(string k) => filtro = filtro == k ? "" : k;
     async Task Excluir(int id) { var r = await Http.DeleteAsync($"api/alertas/{id}"); msg = r.IsSuccessStatusCode ? "Alerta excluído." : await Forms.ErroAsync(r, "Não foi possível excluir"); await Carregar(); }
     async Task Lido(int id) { await Http.PostAsync($"api/alertas/{id}/lido", null); await Carregar(); }
 }

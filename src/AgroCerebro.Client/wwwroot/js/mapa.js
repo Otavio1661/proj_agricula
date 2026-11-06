@@ -39,6 +39,32 @@ window.mapa = (() => {
       map.on('click', e => { if (!drawing) return; pts.push(e.latlng); redraw(); });
       overlays = {};
     },
+    // Visão "Todas as fazendas": marcador + talhões coloridos por fazenda, enquadrando tudo.
+    initTodas(id, fazendas) {
+      if (map) { map.remove(); map = null; }
+      const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
+      const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Esri World Imagery' });
+      map = L.map(id, { layers: [sat] }).setView([-14, -52], 4);
+      L.control.layers({ 'Satélite': sat, 'Mapa': osm }).addTo(map);
+      layerTalhoes = L.featureGroup().addTo(map); layerDraw = L.featureGroup().addTo(map);
+      overlays = {};
+      const all = L.featureGroup();
+      fazendas.forEach(f => {
+        L.marker([f.lat, f.lon]).bindTooltip(f.nome, { permanent: true, direction: 'top', offset: [-14, -8] }).addTo(all);
+        (f.talhoes || []).forEach(t => { if (!t.geoJson) return; try {
+          L.geoJSON(JSON.parse(t.geoJson), { style: { color: f.cor, weight: 2, fillColor: f.cor, fillOpacity: .22 } })
+            .bindTooltip(t.nome + ' · ' + f.nome).addTo(all);
+        } catch { } });
+      });
+      all.addTo(layerTalhoes);
+      if (all.getLayers().length) map.fitBounds(all.getBounds().pad(.2), { maxZoom: 15 });
+    },
+    focus(lat, lon, z) { if (map) map.setView([lat, lon], z || 14); },
+    fitAll() { if (map && layerTalhoes.getLayers().length) map.fitBounds(layerTalhoes.getBounds().pad(.2), { maxZoom: 15 }); },
+    addOverlayQuiet(id, url, b) {
+      if (overlays[id]) map.removeLayer(overlays[id].l);
+      overlays[id] = { l: L.imageOverlay(url, [[b[0], b[1]], [b[2], b[3]]], { opacity: .8 }).addTo(map), url, vari: false };
+    },
     setTalhoes(list) {
       layerTalhoes.clearLayers();
       list.forEach(t => { if (!t.geoJson) return; try {

@@ -4,9 +4,24 @@
 @inject Session S
 @inject IJSRuntime JS
 <PageTitle>Mapa</PageTitle>
-<h1 class="h3">Mapa da propriedade</h1>
+<h1 class="h3">@(S.Todas ? "Mapa de todas as fazendas" : "Mapa da propriedade")</h1>
+<FazendaChips />
+@if (S.Todas && cores.Count > 0)
+{
+    <div class="fz-legend">
+        @foreach (var f in S.Propriedades)
+        {
+            <span class="fz-legend-item"><span class="sw" style="background:@cores[f.Id]"></span> @f.Nome
+                <button type="button" title="Aproximar" @onclick="() => Zoom(f)"><i class="fa-solid fa-magnifying-glass-location"></i></button>
+                <button type="button" title="Abrir esta fazenda" @onclick="() => S.SelecionarAsync(f.Id)"><i class="fa-solid fa-arrow-right"></i></button></span>
+        }
+        <button type="button" class="fz-chip" @onclick='() => JS.InvokeVoidAsync("mapa.fitAll")'><i class="fa-solid fa-expand"></i> Enquadrar tudo</button>
+    </div>
+    <p class="hint">Para desenhar um talhão, abra uma fazenda específica (botão <i class="fa-solid fa-arrow-right"></i> na legenda).</p>
+}
 <div class="d-flex gap-2 flex-wrap mb-2 align-items-center">
-    @if (!desenhando) { <button class="btn btn-primary btn-sm" @onclick="Iniciar"><i class="fa-solid fa-pen"></i> Desenhar talhão</button> }
+    @if (S.Todas) { }
+    else if (!desenhando) { <button class="btn btn-primary btn-sm" @onclick="Iniciar"><i class="fa-solid fa-pen"></i> Desenhar talhão</button> }
     else
     {
         <button class="btn btn-success btn-sm" @onclick="Concluir"><i class="fa-solid fa-check"></i> Concluir</button>
@@ -52,15 +67,38 @@
     protected override async Task OnAfterRenderAsync(bool first)
     {
         if (!first) return;
-        var p = S.Propriedade; if (p == null) { msg = "Cadastre uma propriedade primeiro."; StateHasChanged(); return; }
+        if (S.Todas) { await RecarregarTodas(); return; }
+        var p = S.Propriedade ?? S.Propriedades.FirstOrDefault(); if (p == null) { msg = "Cadastre uma propriedade primeiro."; StateHasChanged(); return; }
         await JS.InvokeVoidAsync("mapa.init", "mapa", p.Latitude, p.Longitude);
         await Recarregar();
     }
+    static readonly string[] Paleta = { "#7CFC00", "#00E5FF", "#FFD600", "#FF4081", "#B388FF", "#FF9100", "#69F0AE", "#40C4FF" };
+    Dictionary<int, string> cores = new();
+    async Task RecarregarTodas()
+    {
+        try
+        {
+            var ts = await Http.GetFromJsonAsync<List<TalhaoFazendaDto>>("api/todas/talhoes") ?? new();
+            cores = S.Propriedades.Select((p, i) => (p.Id, Paleta[i % Paleta.Length])).ToDictionary(x => x.Id, x => x.Item2);
+            var fazendas = S.Propriedades.Select(p => new
+            {
+                id = p.Id, nome = p.Nome, lat = p.Latitude, lon = p.Longitude, cor = cores[p.Id],
+                talhoes = ts.Where(t => t.Talhao.PropriedadeId == p.Id).Select(t => new { id = t.Talhao.Id, nome = t.Talhao.Nome, geoJson = t.Talhao.GeoJson })
+            });
+            await JS.InvokeVoidAsync("mapa.initTodas", "mapa", fazendas);
+            var ms = await Http.GetFromJsonAsync<List<MissaoFazendaDto>>("api/todas/missoes") ?? new();
+            imagens = ms.SelectMany(m => m.Missao.Imagens).ToList();
+            foreach (var i in imagens) await JS.InvokeVoidAsync("mapa.addOverlayQuiet", i.Id, i.Url, new[] { i.Sul, i.Oeste, i.Norte, i.Leste });
+            StateHasChanged();
+        }
+        catch { msg = "Dados do mapa indisponíveis (offline?)."; StateHasChanged(); }
+    }
+    async Task Zoom(PropriedadeDto f) => await JS.InvokeVoidAsync("mapa.focus", f.Latitude, f.Longitude, 14);
     async Task Recarregar()
     {
         try
         {
-            talhoes = await Http.GetFromJsonAsync<List<TalhaoDto>>($"api/propriedades/{S.PropriedadeId}/talhoes") ?? new();
+            talhoes = await Http.GetFromJsonAsync<List<TalhaoDto>>($"api/propriedades/{(S.PropriedadeId > 0 ? S.PropriedadeId : S.Propriedades.First().Id)}/talhoes") ?? new();
             await JS.InvokeVoidAsync("mapa.setTalhoes", talhoes.Select(t => new { id = t.Id, nome = t.Nome, geoJson = t.GeoJson }));
             imagens.Clear();
             foreach (var t in talhoes)
@@ -90,7 +128,7 @@
         busy = true;
         try
         {
-            var r = await Http.PostAsJsonAsync($"api/propriedades/{S.PropriedadeId}/talhoes", new TalhaoSalvarRequest(nome.Trim(), novo!.Value.areaHa, novo.Value.geoJson, null));
+            var r = await Http.PostAsJsonAsync($"api/propriedades/{(S.PropriedadeId > 0 ? S.PropriedadeId : S.Propriedades.First().Id)}/talhoes", new TalhaoSalvarRequest(nome.Trim(), novo!.Value.areaHa, novo.Value.geoJson, null));
             msgOk = r.IsSuccessStatusCode;
             msg = msgOk ? "Talhão salvo." : await Forms.ErroAsync(r, "Não foi possível salvar o talhão");
             if (msgOk) { novo = null; await Recarregar(); }

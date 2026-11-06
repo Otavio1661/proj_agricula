@@ -2,18 +2,43 @@
 @inject HttpClient Http
 @inject Session S
 <PageTitle>Recomendações</PageTitle>
-<h1 class="h3"><i class="fa-solid fa-brain"></i> Recomendações de aplicação</h1>
+<h1 class="h3"><i class="fa-solid fa-brain"></i> Recomendações de aplicação@(Todas ? " — todas as fazendas" : "")</h1>
 <p class="text-muted">Cruzamos clima (72h), estágio BBCH, pragas e os requisitos biológicos de cada bioinsumo.</p>
+
+@if (Todas && lista != null)
+{
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+        @foreach (var p in S.Propriedades)
+        {
+            var ideais = lista.Count(x => x.FazendaNome == p.Nome && x.Rec.Status == "Ideal");
+            <button type="button" class="badge @(filtro == p.Nome ? "bg-success" : "bg-secondary") border-0" @onclick="() => Alterna(p.Nome)"
+                    title="Recomendações ideais agora">@p.Nome: @ideais ideal(is)</button>
+        }
+    </div>
+    <div class="field mb-3" style="max-width:320px">
+        <label for="r-faz">Fazenda</label>
+        <select id="r-faz" class="form-select" @bind="filtro">
+            <option value="">Todas as fazendas</option>
+            @foreach (var p in S.Propriedades) { <option value="@p.Nome">@p.Nome</option> }
+        </select>
+    </div>
+}
+else if (!Todas && outras != null && outras.Count > 0)
+{
+    <div class="small text-muted mb-2"><i class="fa-solid fa-circle-info"></i> Outras fazendas: @string.Join(" · ", outras.GroupBy(x => x.FazendaNome).Select(g => $"{g.Key} ({g.Count(x => x.Rec.Status == "Ideal")} ideal(is))")) — escolha “Todas as fazendas” no topo para detalhes.</div>
+}
+@if (avisoErro != null) { <div class="alert alert-warning">@avisoErro</div> }
 @if (erro != null) { <div class="alert alert-warning">@erro</div> }
 @if (lista == null && erro == null) { <p>Calculando…</p> }
-@if (lista is { Count: 0 }) { <p class="text-muted">Nenhuma recomendação. Cadastre talhões com plantio ativo.</p> }
+@if (lista != null && Visiveis.Count == 0) { <p class="text-muted">Nenhuma recomendação. Cadastre talhões com plantio ativo.</p> }
 <div class="grid">
-@foreach (var r in lista ?? new())
+@foreach (var x in Visiveis)
 {
+    var r = x.Rec;
     <div class="cardx">
         <span class="badge badge-@r.Status.ToLower()">@r.Status</span>
         <strong>@r.BioinsumoNome</strong>
-        <div class="small text-muted">@r.TalhaoNome @(r.Pragas.Count > 0 ? "· alvo: " + string.Join(", ", r.Pragas) : "")</div>
+        <div class="small text-muted">@if (Todas) { <span class="badge bg-light text-dark border me-1"><i class="fa-solid fa-tractor"></i> @x.FazendaNome</span> }@r.TalhaoNome @(r.Pragas.Count > 0 ? "· alvo: " + string.Join(", ", r.Pragas) : "")</div>
         <p class="mb-1">@r.Motivo</p>
         @foreach (var j in r.Janelas)
         { <div class="small"><i class="fa-solid fa-clock"></i> <strong>@j.Inicio.ToString("ddd dd/MM HH:mm")</strong> → @j.Fim.ToString("HH:mm") (nota @j.Pontuacao.ToString("N0")) – @j.Resumo</div> }
@@ -21,10 +46,42 @@
 }
 </div>
 @code {
-    List<RecomendacaoDto>? lista; string? erro;
+    List<RecomendacaoFazendaDto>? lista, outras; string? erro, avisoErro; string filtro = "";
+    bool Todas => S.PropriedadeId == Session.TodasId && S.Propriedades.Count > 1;
+    int PidUnico => S.PropriedadeId > 0 ? S.PropriedadeId : (S.Propriedades.FirstOrDefault()?.Id ?? 0);
+    List<RecomendacaoFazendaDto> Visiveis => lista == null ? new() : Todas && filtro != "" ? lista.Where(x => x.FazendaNome == filtro).ToList() : lista;
+    void Alterna(string k) => filtro = filtro == k ? "" : k;
+
     protected override async Task OnInitializedAsync()
     {
-        try { if (S.PropriedadeId > 0) lista = await Http.GetFromJsonAsync<List<RecomendacaoDto>>($"api/propriedades/{S.PropriedadeId}/recomendacoes"); }
+        try
+        {
+            if (Todas)
+            {
+                var r = await Http.GetFromJsonAsync<RecomendacoesTodasDto>("api/todas/recomendacoes");
+                lista = r?.Itens ?? new();
+                if (r is { FazendasComErro.Count: > 0 }) avisoErro = "Clima indisponível para: " + string.Join(", ", r.FazendasComErro) + ".";
+            }
+            else if (PidUnico > 0)
+            {
+                var nome = S.NomeFazenda(PidUnico);
+                var l = await Http.GetFromJsonAsync<List<RecomendacaoDto>>($"api/propriedades/{PidUnico}/recomendacoes") ?? new();
+                lista = l.Select(x => new RecomendacaoFazendaDto(PidUnico, nome, x)).ToList();
+                if (S.Propriedades.Count > 1) _ = CarregarOutras();
+            }
+            else lista = new();
+        }
         catch { erro = "Recomendações indisponíveis (offline?)."; }
+    }
+    // Resumo das demais fazendas, carregado em segundo plano (não atrasa a tela).
+    async Task CarregarOutras()
+    {
+        try
+        {
+            var r = await Http.GetFromJsonAsync<RecomendacoesTodasDto>("api/todas/recomendacoes");
+            outras = r?.Itens.Where(x => x.PropriedadeId != PidUnico).ToList();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch { }
     }
 }

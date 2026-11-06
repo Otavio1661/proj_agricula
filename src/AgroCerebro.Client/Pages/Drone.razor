@@ -5,8 +5,32 @@
 @inject IJSRuntime JS
 <PageTitle>Drone</PageTitle>
 <h1 class="h3"><i class="fa-solid fa-helicopter"></i> Mapeamento por drone</h1>
+<FazendaChips />
 <p class="text-muted">Envie ortomosaicos/fotos georreferenciados (JPG/PNG exportados do WebODM, DJI Terra, Pix4D…). Informe os limites (sul, oeste, norte, leste) em graus ou ajuste pelo mapa e use o botão de limites.</p>
-@if (S.PropriedadeId == 0) { <div class="alert alert-info">Selecione uma propriedade.</div> }
+@if (S.Todas)
+{
+    <div class="fz-bar">
+        <div class="field"><label for="d-filtro">Filtrar por fazenda</label>
+            <select id="d-filtro" class="form-select" @bind="filtroFaz"><option value="0">Todas as fazendas</option>@foreach (var p in S.Propriedades) { <option value="@p.Id">@p.Nome</option> }</select></div>
+    </div>
+    @if (todasMissoes == null) { <p class="text-muted">Carregando missões…</p> }
+    else if (!todasMissoes.Any(x => filtroFaz == 0 || x.PropriedadeId == filtroFaz)) { <div class="alert alert-info">Nenhuma missão de drone registrada.</div> }
+    else
+    {
+        <div class="fz-table-wrap"><table class="fz-table">
+            <thead><tr><th>Fazenda</th><th>Talhão</th><th>Missão</th><th>Data</th><th>Equipamento</th><th class="text-end">Imagens</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var x in todasMissoes.Where(x => filtroFaz == 0 || x.PropriedadeId == filtroFaz))
+            {
+                <tr><td><span class="fz-tag"><i class="fa-solid fa-tractor"></i> @x.FazendaNome</span></td><td>@x.TalhaoNome</td><td>#@x.Missao.Id</td><td>@x.Missao.Data.ToString("dd/MM/yyyy")</td>
+                    <td>@(x.Missao.Equipamento ?? "n/i") @(x.Missao.AlturaM != null ? $"· {x.Missao.AlturaM:0} m" : "")</td><td class="text-end">@x.Missao.Imagens.Count</td><td>@x.Missao.Status</td>
+                    <td><button class="btn btn-sm btn-outline-success" @onclick="() => S.SelecionarAsync(x.PropriedadeId)">Abrir fazenda</button></td></tr>
+            }
+            </tbody></table></div>
+    }
+    <p class="hint mt-2">Para criar missões e enviar imagens, abra uma fazenda específica.</p>
+}
+else if (Pid == 0) { <div class="alert alert-info">Selecione uma propriedade.</div> }
 else
 {
     <div class="cardx">
@@ -74,6 +98,8 @@ else
     }
 }
 @code {
+    int Pid => S.PropriedadeId > 0 ? S.PropriedadeId : S.Propriedades.FirstOrDefault()?.Id ?? 0;
+    int filtroFaz; List<MissaoFazendaDto>? todasMissoes;
     List<TalhaoDto> talhoes = new(); List<MissaoDroneDto> missoes = new();
     int talhaoId, missaoId; DateTime data = DateTime.Today; string? equip, msg, tipo = "RGB"; double? altura, gsd; double sul, oeste, norte, leste; IBrowserFile? arq;
 
@@ -82,12 +108,16 @@ else
     string Inv(string k) => erros.ContainsKey(k) ? "invalid" : "";
     protected override async Task OnInitializedAsync()
     {
-        try { if (S.PropriedadeId > 0) talhoes = await Http.GetFromJsonAsync<List<TalhaoDto>>($"api/propriedades/{S.PropriedadeId}/talhoes") ?? new(); }
+        try
+        {
+            if (S.Todas) todasMissoes = await Http.GetFromJsonAsync<List<MissaoFazendaDto>>("api/todas/missoes");
+            else if (Pid > 0) talhoes = await Http.GetFromJsonAsync<List<TalhaoDto>>($"api/propriedades/{Pid}/talhoes") ?? new();
+        }
         catch { msg = "Sem conexão."; }
     }
     protected override async Task OnAfterRenderAsync(bool first)
     {
-        if (first && S.Propriedade is { } p) await JS.InvokeVoidAsync("mapa.init", "mapa", p.Latitude, p.Longitude);
+        if (first && !S.Todas && (S.Propriedade ?? S.Propriedades.FirstOrDefault()) is { } p) await JS.InvokeVoidAsync("mapa.init", "mapa", p.Latitude, p.Longitude);
     }
     int editMissaoId; DateTime emData = DateTime.Today; double? emAlt; string? emEquip, emNotas, emStatus = "Concluida";
     void EditaMissao(MissaoDroneDto m) { editMissaoId = m.Id; emData = m.Data; emAlt = m.AlturaM; emEquip = m.Equipamento; emStatus = m.Status ?? "Concluida"; emNotas = null; msg = ""; }

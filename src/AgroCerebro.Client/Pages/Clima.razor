@@ -3,31 +3,82 @@
 @inject Session S
 <PageTitle>Clima</PageTitle>
 <h1 class="h3">Clima – próximas 72h</h1>
+<FazendaChips />
 @if (erro != null) { <div class="alert alert-warning">@erro</div> }
-@if (c != null)
+@if (S.Todas)
+{
+    @if (todas == null) { <p class="text-muted">Carregando clima das fazendas…</p> }
+    else
+    {
+        <div class="fz-clima-grid">
+        @foreach (var f in todas)
+        {
+            <button type="button" class="fz-clima-card" @onclick="() => S.SelecionarAsync(f.PropriedadeId)" title="Abrir gráficos detalhados">
+                <h3><i class="fa-solid fa-tractor"></i> @f.FazendaNome</h3>
+                @if (f.TemperaturaC == null) { <div class="text-muted small">@(f.Erro ?? "Sem dados")</div> }
+                else
+                {
+                    <div class="fz-clima-now">@f.TemperaturaC.Value.ToString("N1") °C</div>
+                    <div class="fz-clima-meta">
+                        <span><i class="fa-solid fa-droplet"></i> @f.UmidadePct?.ToString("N0")%</span>
+                        <span><i class="fa-solid fa-wind"></i> @f.VentoKmh?.ToString("N0") km/h</span>
+                        <span><i class="fa-solid fa-cloud-rain"></i> @f.Chuva24hMm?.ToString("N1") mm/24h</span>
+                    </div>
+                    <div class="fz-clima-meta"><span>24h: mín @f.Min24h?.ToString("N0")° · máx @f.Max24h?.ToString("N0")°</span></div>
+                    @Spark(f.Temp24h)
+                }
+            </button>
+        }
+        </div>
+        <p class="hint mt-2">Toque em uma fazenda para ver os gráficos detalhados de 72h.</p>
+    }
+}
+else if (c != null)
 {
     <p>Agora: <strong>@c.TemperaturaAtualC.ToString("N1") °C</strong> · <i class="fa-solid fa-droplet"></i> @c.UmidadeAtualPct.ToString("N0")% · <i class="fa-solid fa-wind"></i> @c.VentoAtualKmh.ToString("N0") km/h <span class="small text-muted">(fonte: @c.Fonte)</span></p>
-    @Chart("<i class='fa-solid fa-temperature-half'></i> Temperatura (°C)", c.Horas.Select(h => h.TemperaturaC), 0, 45, "#e65100")
-    @Chart("<i class='fa-solid fa-droplet'></i> Umidade relativa (%)", c.Horas.Select(h => h.UmidadePct), 0, 100, "#0277bd")
-    @Chart("<i class='fa-solid fa-cloud-rain'></i> Chuva (mm/h)", c.Horas.Select(h => h.ChuvaMm), 0, Math.Max(2, c.Horas.Max(h => h.ChuvaMm)), "#1a237e")
-    @Chart("<i class='fa-solid fa-wind'></i> Vento (km/h)", c.Horas.Select(h => h.VentoKmh), 0, Math.Max(20, c.Horas.Max(h => h.VentoKmh)), "#6d4c41")
+    @Chart("<i class='fa-solid fa-temperature-half'></i> Temperatura (°C)", c.Horas.Select(h => h.TemperaturaC), 0, 45, "#e65100", "°C")
+    @Chart("<i class='fa-solid fa-droplet'></i> Umidade relativa (%)", c.Horas.Select(h => h.UmidadePct), 0, 100, "#0277bd", "%")
+    @Chart("<i class='fa-solid fa-cloud-rain'></i> Chuva (mm/h)", c.Horas.Select(h => h.ChuvaMm), 0, Math.Max(2, c.Horas.Max(h => h.ChuvaMm)), "#1a237e", "mm")
+    @Chart("<i class='fa-solid fa-wind'></i> Vento (km/h)", c.Horas.Select(h => h.VentoKmh), 0, Math.Max(20, c.Horas.Max(h => h.VentoKmh)), "#6d4c41", "km/h")
 }
 @code {
-    ClimaDto? c; string? erro;
+    ClimaDto? c; string? erro; List<ClimaFazendaDto>? todas;
     protected override async Task OnInitializedAsync()
     {
-        try { if (S.PropriedadeId > 0) c = await Http.GetFromJsonAsync<ClimaDto>($"api/propriedades/{S.PropriedadeId}/clima"); }
+        try
+        {
+            if (S.Todas) todas = await Http.GetFromJsonAsync<List<ClimaFazendaDto>>("api/todas/clima");
+            else
+            {
+                var pid = S.PropriedadeId > 0 ? S.PropriedadeId : S.Propriedades.FirstOrDefault()?.Id ?? 0;
+                if (pid > 0) c = await Http.GetFromJsonAsync<ClimaDto>($"api/propriedades/{pid}/clima");
+            }
+        }
         catch { erro = "Clima indisponível (offline?)."; }
     }
-    RenderFragment Chart(string titulo, IEnumerable<double> vals, double min, double max, string cor) => __b =>
+    MarkupString Spark(List<double> v)
     {
-        var l = vals.ToList(); int i = 0;
-        __b.AddMarkupContent(i++, $"<div class='cardx'><strong>{titulo}</strong><div class='bars'>");
-        foreach (var v in l)
+        if (v.Count < 2) return default;
+        double mn = v.Min(), mx = v.Max(), r = Math.Max(mx - mn, 0.5);
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        var pts = string.Join(" ", v.Select((x, i) => $"{(i * 100.0 / (v.Count - 1)).ToString("0.#", inv)},{(34 - (x - mn) / r * 30).ToString("0.#", inv)}"));
+        return new MarkupString($"<svg class='fz-spark' viewBox='0 0 100 38' preserveAspectRatio='none'><polyline fill='none' stroke='#e65100' stroke-width='2' vector-effect='non-scaling-stroke' points='{pts}'/></svg>");
+    }
+    MarkupString Chart(string titulo, IEnumerable<double> vals, double min, double max, string cor, string unid)
+    {
+        var l = vals.ToList(); var horas = c!.Horas;
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        var sb = new System.Text.StringBuilder();
+        var mx = l.Count > 0 ? l.Max() : 0; var mn = l.Count > 0 ? l.Min() : 0;
+        sb.Append($"<div class='cardx clima-card'><div class='clima-head'><strong>{titulo}</strong><span class='small text-muted'>mín {mn:N1} · máx {mx:N1} {unid}</span></div><div class='clima-bars'>");
+        for (var i = 0; i < l.Count; i++)
         {
-            var pct = max <= min ? 0 : Math.Clamp((v - min) / (max - min) * 100, 2, 100);
-            __b.AddMarkupContent(i++, $"<div title='{v:N1}' style='height:{pct.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)}%;background:{cor}'></div>");
+            var pct = max <= min ? 0 : Math.Clamp((l[i] - min) / (max - min) * 100, 3, 100);
+            var h = horas[i];
+            var tick = h.Hora.Hour % 6 == 0 ? $"<span class='tick'>{(h.Hora.Hour == 0 ? h.Hora.ToString("dd/MM") : h.Hora.Hour + "h")}</span>" : "";
+            sb.Append($"<div class='bar-col' title='{h.Hora:dd/MM HH}h — {l[i]:N1} {unid}'><div class='bar{(h.EDia ? "" : " night")}' style='height:{pct.ToString("N0", inv)}%;background:{cor}'></div>{tick}</div>");
         }
-        __b.AddMarkupContent(i++, "</div></div>");
-    };
+        sb.Append("</div></div>");
+        return new MarkupString(sb.ToString());
+    }
 }

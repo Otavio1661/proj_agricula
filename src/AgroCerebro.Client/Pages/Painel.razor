@@ -1,50 +1,187 @@
 @page "/"
 @inject HttpClient Http
 @inject Session S
+@inject NavigationManager Nav
 <PageTitle>Painel – AgroCérebro</PageTitle>
 <h1 class="h3">Painel</h1>
-@if (S.PropriedadeId == 0) { <div class="alert alert-info">Cadastre sua primeira propriedade em <a href="propriedades">Fazendas</a>.</div> }
-@if (erro != null) { <div class="alert alert-warning">@erro</div> }
-@if (p != null)
+
+@if (carregando)
 {
-    <div class="grid">
-        <div class="cardx"><div class="small text-muted">Propriedades</div><div class="stat">@p.Propriedades</div></div>
-        <div class="cardx"><div class="small text-muted">Talhões</div><div class="stat">@p.Talhoes</div></div>
-        <div class="cardx"><div class="small text-muted">Área total</div><div class="stat">@p.AreaTotalHa.ToString("N1") ha</div></div>
-        <div class="cardx"><div class="small text-muted">Alertas não lidos</div><div class="stat">@p.AlertasNaoLidos</div></div>
-        @if (clima != null)
-        {
-            <div class="cardx"><div class="small text-muted">Agora na fazenda</div>
-                <div class="stat">@clima.TemperaturaAtualC.ToString("N1") °C</div>
-                <div><i class="fa-solid fa-droplet"></i> @clima.UmidadeAtualPct.ToString("N0")% · <i class="fa-solid fa-wind"></i> @clima.VentoAtualKmh.ToString("N0") km/h</div></div>
-        }
-    </div>
-    <h2 class="h5 mt-3"><i class="fa-solid fa-brain"></i> Melhores janelas de aplicação</h2>
-    @if (p.Recomendacoes.Count == 0) { <p class="text-muted">Sem recomendações — cadastre talhões com plantio ativo.</p> }
-    <div class="grid">
-        @foreach (var r in p.Recomendacoes.Take(6))
-        {
-            <div class="cardx">
-                <span class="badge badge-@r.Status.ToLower()">@r.Status</span> <strong>@r.BioinsumoNome</strong>
-                <div class="small text-muted">@r.TalhaoNome</div>
-                <div>@r.Motivo</div>
-                @foreach (var j in r.Janelas.Take(2)) { <div class="small"><i class="fa-solid fa-clock"></i> @j.Inicio.ToString("dd/MM HH:mm") – @j.Fim.ToString("HH:mm")</div> }
-            </div>
-        }
-    </div>
-    <h2 class="h5 mt-3"><i class="fa-solid fa-bell"></i> Últimos alertas</h2>
-    @foreach (var a in p.UltimosAlertas)
-    { <div class="cardx nivel-@a.Nivel"><strong>@a.Titulo</strong><div>@a.Mensagem</div><div class="small text-muted">@a.CriadoEm.ToLocalTime().ToString("g")</div></div> }
+    <div class="pn-kpis">@for (var i = 0; i < 4; i++) { <div class="pn-kpi pn-skel"></div> }</div>
+    <div class="pn-grid">@for (var i = 0; i < 3; i++) { <div class="pn-card pn-skel" style="height:220px"></div> }</div>
 }
+else
+{
+    @if (erro != null) { <div class="alert alert-warning">@erro</div> }
+    @if (fazendas.Count == 0)
+    {
+        <div class="pn-empty">
+            <i class="fa-solid fa-tractor"></i>
+            <h2 class="h5">Nenhuma fazenda ainda</h2>
+            <p class="text-muted">Cadastre sua primeira propriedade para ver clima, alertas e janelas de aplicação.</p>
+            <a class="btn btn-primary" href="propriedades"><i class="fa-solid fa-plus"></i> Cadastrar fazenda</a>
+        </div>
+    }
+    else
+    {
+        <div class="pn-kpis">
+            <div class="pn-kpi"><i class="fa-solid fa-tractor"></i><div><div class="pn-kpi-n">@fazendas.Count</div><div class="pn-kpi-l">Fazendas</div></div></div>
+            <div class="pn-kpi"><i class="fa-solid fa-wheat-awn"></i><div><div class="pn-kpi-n">@fazendas.Sum(f => f.Talhoes)</div><div class="pn-kpi-l">Talhões</div></div></div>
+            <div class="pn-kpi"><i class="fa-solid fa-ruler-combined"></i><div><div class="pn-kpi-n">@fazendas.Sum(f => f.AreaHa).ToString("N0") ha</div><div class="pn-kpi-l">Área total</div></div></div>
+            <div class="pn-kpi @(fazendas.Sum(f => f.AlertasNaoLidos) > 0 ? "pn-kpi-warn" : "")"><i class="fa-solid fa-bell"></i><div><div class="pn-kpi-n">@fazendas.Sum(f => f.AlertasNaoLidos)</div><div class="pn-kpi-l">Alertas não lidos</div></div></div>
+        </div>
+
+        <h2 class="h5 pn-sec"><i class="fa-solid fa-table-cells-large"></i> Minhas fazendas</h2>
+        <div class="pn-grid">
+            @foreach (var f in fazendas)
+            {
+                <div class="pn-card pn-@f.Situacao.ToLower() @(f.Id == S.PropriedadeId ? "pn-atual" : "")">
+                    <div class="pn-card-top">
+                        <div>
+                            <div class="pn-nome">@f.Nome</div>
+                            <div class="pn-loc"><i class="fa-solid fa-location-dot"></i> @(string.Join("/", new[] { f.Municipio, f.Uf }.Where(x => !string.IsNullOrWhiteSpace(x))) is { Length: > 0 } l ? l : "Local não informado")</div>
+                        </div>
+                        <span class="pn-chip pn-chip-@f.Situacao.ToLower()"><i class="fa-solid @IconeSituacao(f.Situacao)"></i> @TextoSituacao(f.Situacao)</span>
+                    </div>
+                    <div class="pn-clima">
+                        @if (f.TemperaturaC != null)
+                        {
+                            <span><i class="fa-solid fa-temperature-half"></i> <strong>@f.TemperaturaC.Value.ToString("N0")°C</strong></span>
+                            <span><i class="fa-solid fa-droplet"></i> @f.UmidadePct?.ToString("N0")%</span>
+                            <span><i class="fa-solid fa-wind"></i> @f.VentoKmh?.ToString("N0") km/h</span>
+                        }
+                        else { <span class="text-muted"><i class="fa-solid fa-cloud"></i> Clima indisponível</span> }
+                    </div>
+                    <div class="pn-nums">
+                        <div><b>@f.Talhoes</b><span>talhões · @f.AreaTalhoesHa.ToString("N0") ha</span></div>
+                        <div><b class="@(f.PragasAtivas > 0 ? "pn-bad" : "")">@f.PragasAtivas</b><span>pragas (14 d)</span></div>
+                        <div><b class="@(f.AlertasNaoLidos > 0 ? "pn-bad" : "")">@f.AlertasNaoLidos</b><span>alertas</span></div>
+                        <div><b>@f.LotesEstoque</b><span>lotes @(f.LotesVencendo30d > 0 ? $"({f.LotesVencendo30d} vencendo)" : "")</span></div>
+                    </div>
+                    <div class="pn-culturas">
+                        @foreach (var c in f.Culturas) { <span class="pn-tag">@c</span> }
+                        @if (f.Culturas.Count == 0) { <span class="text-muted small">Sem plantio ativo</span> }
+                    </div>
+                    <div class="pn-janela">
+                        @if (f.ProximaJanela != null) { <i class="fa-solid fa-clock"></i> <span>Próxima janela ideal: <strong>@f.ProximaJanela.Value.ToString("dd/MM HH:mm")</strong> (@f.RecomendacoesIdeais produto(s))</span> }
+                        else { <i class="fa-regular fa-clock"></i> <span class="text-muted">Sem janela de aplicação indicada agora</span> }
+                    </div>
+                    <div class="pn-card-foot">
+                        <span class="pn-papel">@f.Papel</span>
+                        <div class="d-flex gap-1">
+                            <button class="btn btn-sm btn-outline-success" @onclick='() => Abrir(f.Id, "mapa")'><i class="fa-solid fa-map-location-dot"></i> Mapa</button>
+                            <button class="btn btn-sm btn-primary" @onclick='() => Abrir(f.Id, "talhoes")'>Abrir <i class="fa-solid fa-arrow-right"></i></button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <h2 class="h5 pn-sec"><i class="fa-solid fa-table"></i> Visão detalhada das fazendas</h2>
+        <div class="pn-table-wrap">
+            <table class="pn-table">
+                <thead><tr>
+                    @Th("Fazenda", "nome") @Th("Local", "local") @Th("Situação", "sit") @Th("Área (ha)", "area") @Th("Talhões", "talhoes") @Th("Culturas", "culturas")
+                    @Th("Pragas", "pragas") @Th("Alertas", "alertas") @Th("Críticos", "criticos") @Th("Lotes", "lotes") @Th("Vencendo", "venc") @Th("Temp.", "temp") @Th("UR", "ur") @Th("Vento", "vento") @Th("Próx. janela", "janela") @Th("Papel", "papel")
+                </tr></thead>
+                <tbody>
+                @foreach (var f in Ordenadas())
+                {
+                    <tr class="@(f.Id == S.PropriedadeId ? "pn-row-atual" : "")" @onclick='() => Abrir(f.Id, "talhoes")'>
+                        <td><strong>@f.Nome</strong></td>
+                        <td>@(f.Municipio ?? "—")@(string.IsNullOrWhiteSpace(f.Uf) ? "" : "/" + f.Uf)</td>
+                        <td><span class="pn-chip pn-chip-@f.Situacao.ToLower()">@TextoSituacao(f.Situacao)</span></td>
+                        <td class="num">@f.AreaHa.ToString("N1")</td>
+                        <td class="num">@f.Talhoes</td>
+                        <td>@(f.Culturas.Count > 0 ? string.Join(", ", f.Culturas) : "—")</td>
+                        <td class="num @(f.PragasAtivas > 0 ? "pn-bad" : "")">@f.PragasAtivas</td>
+                        <td class="num">@f.AlertasNaoLidos</td>
+                        <td class="num @(f.AlertasCriticos > 0 ? "pn-bad" : "")">@f.AlertasCriticos</td>
+                        <td class="num">@f.LotesEstoque</td>
+                        <td class="num @(f.LotesVencendo30d > 0 ? "pn-bad" : "")">@f.LotesVencendo30d</td>
+                        <td class="num">@(f.TemperaturaC?.ToString("N0") ?? "—")°</td>
+                        <td class="num">@(f.UmidadePct?.ToString("N0") ?? "—")%</td>
+                        <td class="num">@(f.VentoKmh?.ToString("N0") ?? "—")</td>
+                        <td>@(f.ProximaJanela?.ToString("dd/MM HH:mm") ?? "—")</td>
+                        <td>@f.Papel</td>
+                    </tr>
+                }
+                </tbody>
+                <tfoot><tr>
+                    <td colspan="3"><strong>Total</strong></td>
+                    <td class="num"><strong>@fazendas.Sum(f => f.AreaHa).ToString("N1")</strong></td>
+                    <td class="num"><strong>@fazendas.Sum(f => f.Talhoes)</strong></td><td></td>
+                    <td class="num"><strong>@fazendas.Sum(f => f.PragasAtivas)</strong></td>
+                    <td class="num"><strong>@fazendas.Sum(f => f.AlertasNaoLidos)</strong></td>
+                    <td class="num"><strong>@fazendas.Sum(f => f.AlertasCriticos)</strong></td>
+                    <td class="num"><strong>@fazendas.Sum(f => f.LotesEstoque)</strong></td>
+                    <td class="num"><strong>@fazendas.Sum(f => f.LotesVencendo30d)</strong></td>
+                    <td colspan="5"></td>
+                </tr></tfoot>
+            </table>
+        </div>
+
+        @if (p != null)
+        {
+            <h2 class="h5 pn-sec"><i class="fa-solid fa-brain"></i> Melhores janelas de aplicação</h2>
+            @if (p.Recomendacoes.Count == 0) { <p class="text-muted">Sem recomendações — cadastre talhões com plantio ativo e registre pragas.</p> }
+            <div class="pn-grid pn-grid-sm">
+                @foreach (var r in p.Recomendacoes.Take(6))
+                {
+                    <div class="pn-card pn-mini">
+                        <span class="badge badge-@r.Status.ToLower()">@r.Status</span> <strong>@r.BioinsumoNome</strong>
+                        <div class="small text-muted">@r.TalhaoNome</div>
+                        <div class="small">@r.Motivo</div>
+                        @foreach (var j in r.Janelas.Take(2)) { <div class="small"><i class="fa-solid fa-clock"></i> @j.Inicio.ToString("dd/MM HH:mm") – @j.Fim.ToString("HH:mm")</div> }
+                    </div>
+                }
+            </div>
+            <h2 class="h5 pn-sec"><i class="fa-solid fa-bell"></i> Últimos alertas</h2>
+            @if (p.UltimosAlertas.Count == 0) { <p class="text-muted">Nenhum alerta por enquanto.</p> }
+            @foreach (var a in p.UltimosAlertas)
+            { <div class="pn-card pn-mini nivel-@a.Nivel"><strong>@a.Titulo</strong><div class="small">@a.Mensagem</div><div class="small text-muted">@a.CriadoEm.ToLocalTime().ToString("g")</div></div> }
+        }
+    }
+}
+
 @code {
-    PainelDto? p; ClimaDto? clima; string? erro;
+    List<FazendaResumoDto> fazendas = new(); PainelDto? p; string? erro; bool carregando = true;
+    string ordCol = "nome"; bool ordAsc = true;
+
     protected override async Task OnInitializedAsync()
     {
-        try
+        try { fazendas = await Http.GetFromJsonAsync<List<FazendaResumoDto>>("api/painel/fazendas") ?? new(); }
+        catch { erro = "Não foi possível carregar as fazendas (offline?)."; }
+        carregando = false;
+        StateHasChanged();
+        try { p = await Http.GetFromJsonAsync<PainelDto>("api/painel"); } catch { }
+    }
+
+    async Task Abrir(int id, string destino) { await S.SelecionarAsync(id); Nav.NavigateTo(destino); }
+
+    static string TextoSituacao(string s) => s switch { "Critico" => "Crítico", "Atencao" => "Atenção", _ => "Tudo certo" };
+    static string IconeSituacao(string s) => s switch { "Critico" => "fa-triangle-exclamation", "Atencao" => "fa-circle-exclamation", _ => "fa-circle-check" };
+
+    void Ordenar(string col) { if (ordCol == col) ordAsc = !ordAsc; else { ordCol = col; ordAsc = true; } }
+    RenderFragment Th(string titulo, string col) => b =>
+    {
+        b.OpenElement(0, "th");
+        b.AddAttribute(1, "class", "pn-th");
+        b.AddAttribute(2, "onclick", EventCallback.Factory.Create(this, () => Ordenar(col)));
+        b.AddContent(3, titulo + (ordCol == col ? (ordAsc ? " ▲" : " ▼") : ""));
+        b.CloseElement();
+    };
+
+    IEnumerable<FazendaResumoDto> Ordenadas()
+    {
+        Func<FazendaResumoDto, object?> key = ordCol switch
         {
-            p = await Http.GetFromJsonAsync<PainelDto>("api/painel");
-            if (S.PropriedadeId > 0) clima = await Http.GetFromJsonAsync<ClimaDto>($"api/propriedades/{S.PropriedadeId}/clima");
-        }
-        catch (Exception) { erro = "Não foi possível carregar tudo (offline?)."; }
+            "local" => f => f.Municipio, "sit" => f => f.Situacao, "area" => f => f.AreaHa, "talhoes" => f => f.Talhoes,
+            "culturas" => f => string.Join(",", f.Culturas), "pragas" => f => f.PragasAtivas, "alertas" => f => f.AlertasNaoLidos,
+            "criticos" => f => f.AlertasCriticos, "lotes" => f => f.LotesEstoque, "venc" => f => f.LotesVencendo30d,
+            "temp" => f => f.TemperaturaC, "ur" => f => f.UmidadePct, "vento" => f => f.VentoKmh, "janela" => f => f.ProximaJanela,
+            "papel" => f => f.Papel, _ => f => f.Nome
+        };
+        return ordAsc ? fazendas.OrderBy(key) : fazendas.OrderByDescending(key);
     }
 }

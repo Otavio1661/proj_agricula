@@ -2,22 +2,42 @@
 @inject HttpClient Http
 @inject Session S
 <PageTitle>Estoque</PageTitle>
-<h1 class="h3"><i class="fa-solid fa-boxes-stacked"></i> Estoque de bioinsumos</h1>
-@if (S.PropriedadeId == 0) { <div class="alert alert-info">Selecione uma propriedade.</div> }
+<h1 class="h3"><i class="fa-solid fa-boxes-stacked"></i> Estoque de bioinsumos@(Todas ? " — todas as fazendas" : "")</h1>
+@if (S.Propriedades.Count == 0) { <div class="alert alert-info">Cadastre uma propriedade primeiro.</div> }
 else
 {
+    @if (Todas)
+    {
+        <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+            @foreach (var p in S.Propriedades)
+            {
+                var n = todos.Count(x => x.FazendaNome == p.Nome); var v = todos.Count(x => x.FazendaNome == p.Nome && x.Lote.Validade < DateTime.Today.AddDays(30));
+                <button type="button" class="badge @(filtro == p.Nome ? "bg-success" : "bg-secondary") border-0" @onclick="() => Alterna(p.Nome)">@p.Nome: @n lote(s)@(v > 0 ? $" · {v} vencendo" : "")</button>
+            }
+        </div>
+        <div class="field mb-2" style="max-width:320px">
+            <label for="e-filtro">Fazenda</label>
+            <select id="e-filtro" class="form-select" @bind="filtro"><option value="">Todas as fazendas</option>@foreach (var p in S.Propriedades) { <option value="@p.Nome">@p.Nome</option> }</select>
+        </div>
+    }
+    else if (outrosVencendo > 0)
+    {
+        <div class="small text-muted mb-2"><i class="fa-solid fa-circle-info"></i> Outras fazendas têm @outrosVencendo lote(s) vencendo em 30 dias — escolha “Todas as fazendas” no topo.</div>
+    }
     <div class="table-wrap cardx">
         <table class="table table-sm">
-            <thead><tr><th>Produto</th><th>Lote</th><th>Qtd</th><th>Validade</th><th>Temp. armaz.</th><th></th></tr></thead>
+            <thead><tr>@if (Todas) { <th>Fazenda</th> }<th>Produto</th><th>Lote</th><th>Qtd</th><th>Validade</th><th>Temp. armaz.</th><th></th></tr></thead>
             <tbody>
-            @foreach (var l in lotes)
+            @foreach (var x in Visiveis)
             {
+                var l = x.Lote;
                 var venc = l.Validade < DateTime.Today.AddDays(30);
-                <tr><td>@l.BioinsumoNome</td><td>@l.Lote</td><td>@l.Quantidade @l.Unidade</td>
+                <tr>@if (Todas) { <td><span class="badge bg-light text-dark border">@x.FazendaNome</span></td> }<td>@l.BioinsumoNome</td><td>@l.Lote</td><td>@l.Quantidade @l.Unidade</td>
                     <td class="@(venc ? "text-danger fw-bold" : "")">@l.Validade.ToString("dd/MM/yyyy")</td>
                     <td>@(l.TempArmazenamentoC?.ToString("N1") ?? "-") °C</td>
-                    <td class="text-nowrap"><button class="btn btn-sm btn-outline-secondary" @onclick="() => Editar(l)"><i class="fa-solid fa-pen"></i> Editar</button> <ConfirmaExcluir OnConfirmar="() => Excluir(l.Id)" /></td></tr>
+                    <td class="text-nowrap"><button class="btn btn-sm btn-outline-secondary" @onclick="() => Editar(l)"><i class="fa-solid fa-pen"></i> Editar</button> <ConfirmaExcluir OnConfirmar="() => Excluir(l)" /></td></tr>
             }
+            @if (Visiveis.Count == 0) { <tr><td colspan="7" class="text-muted">Nenhum lote cadastrado.</td></tr> }
             </tbody>
         </table>
     </div>
@@ -25,6 +45,11 @@ else
         <h2 class="h5">@(editId == 0 ? "Novo lote" : "Editar lote")</h2>
         <p class="hint">Campos com <span class="req"></span> são obrigatórios. A temperatura de armazenamento gera alerta se passar do limite do produto.</p>
         <div class="row g-3">
+            @if (S.Propriedades.Count > 1)
+            {
+                <div class="col-12 field"><label class="req" for="e-faz">Fazenda do lote</label>
+                    <select id="e-faz" class="form-select @Inv("faz")" @bind="formFaz" disabled="@(editId != 0)"><option value="0">Selecione a fazenda…</option>@foreach (var p in S.Propriedades) { <option value="@p.Id">@p.Nome</option> }</select>@Err("faz")</div>
+            }
             <div class="col-12 col-md-6 field"><label class="req" for="e-bio">Produto (bioinsumo)</label>
                 <select id="e-bio" class="form-select" @bind="bioId">@foreach (var b in bios) { <option value="@b.Id">@b.Nome</option> }</select></div>
             <div class="col-12 col-md-6 field"><label class="req" for="e-lote">Código do lote</label>
@@ -44,27 +69,47 @@ else
     </div>
 }
 @code {
-    List<LoteEstoqueDto> lotes = new(); List<BioinsumoDto> bios = new(); Dictionary<string, string> erros = new();
+    List<LoteFazendaDto> todos = new(); List<BioinsumoDto> bios = new(); string filtro = ""; int formFaz, outrosVencendo;
+    bool Todas => S.PropriedadeId == Session.TodasId && S.Propriedades.Count > 1;
+    int PidUnico => S.PropriedadeId > 0 ? S.PropriedadeId : (S.Propriedades.FirstOrDefault()?.Id ?? 0);
+    List<LoteFazendaDto> Visiveis => Todas && filtro != "" ? todos.Where(x => x.FazendaNome == filtro).ToList() : todos;
+    void Alterna(string k) => filtro = filtro == k ? "" : k;
+    Dictionary<string, string> erros = new();
     int bioId, editId; string lote = "", un = "L", msg = ""; bool msgOk, busy; double qtd; double? temp; DateTime validade = DateTime.Today.AddMonths(6);
     MarkupString Err(string k) => erros.TryGetValue(k, out var m) ? new MarkupString($"<div class='field-err'>{m}</div>") : default;
     string Inv(string k) => erros.ContainsKey(k) ? "invalid" : "";
     protected override async Task OnInitializedAsync()
     {
+        formFaz = Todas ? 0 : PidUnico;
         try { bios = await Http.GetFromJsonAsync<List<BioinsumoDto>>("api/catalogo/bioinsumos") ?? new(); if (bios.Count > 0) bioId = bios[0].Id; await Carregar(); }
         catch { msg = "Sem conexão."; }
     }
-    async Task Carregar() { if (S.PropriedadeId > 0) lotes = await Http.GetFromJsonAsync<List<LoteEstoqueDto>>($"api/propriedades/{S.PropriedadeId}/estoque") ?? new(); }
-    void Editar(LoteEstoqueDto l) { editId = l.Id; bioId = l.BioinsumoId; lote = l.Lote; qtd = l.Quantidade; un = l.Unidade; validade = l.Validade; temp = l.TempArmazenamentoC; erros.Clear(); msg = ""; }
-    void CancelarEdicao() { editId = 0; lote = ""; qtd = 0; temp = null; msg = ""; }
-    async Task Excluir(int id)
+    async Task Carregar()
     {
-        var r = await Http.DeleteAsync($"api/propriedades/{S.PropriedadeId}/estoque/{id}");
+        if (Todas) todos = await Http.GetFromJsonAsync<List<LoteFazendaDto>>("api/todas/estoque") ?? new();
+        else if (PidUnico > 0)
+        {
+            var nome = S.NomeFazenda(PidUnico);
+            todos = (await Http.GetFromJsonAsync<List<LoteEstoqueDto>>($"api/propriedades/{PidUnico}/estoque") ?? new()).Select(l => new LoteFazendaDto(l, nome)).ToList();
+            if (S.Propriedades.Count > 1)
+            {
+                var tudo = await Http.GetFromJsonAsync<List<LoteFazendaDto>>("api/todas/estoque") ?? new();
+                outrosVencendo = tudo.Count(x => x.Lote.PropriedadeId != PidUnico && x.Lote.Validade < DateTime.Today.AddDays(30));
+            }
+        }
+    }
+    void Editar(LoteEstoqueDto l) { editId = l.Id; formFaz = l.PropriedadeId; bioId = l.BioinsumoId; lote = l.Lote; qtd = l.Quantidade; un = l.Unidade; validade = l.Validade; temp = l.TempArmazenamentoC; erros.Clear(); msg = ""; }
+    void CancelarEdicao() { editId = 0; formFaz = Todas ? 0 : PidUnico; lote = ""; qtd = 0; temp = null; msg = ""; }
+    async Task Excluir(LoteEstoqueDto l)
+    {
+        var r = await Http.DeleteAsync($"api/propriedades/{l.PropriedadeId}/estoque/{l.Id}");
         msgOk = r.IsSuccessStatusCode; msg = msgOk ? "Lote excluído." : await Forms.ErroAsync(r, "Não foi possível excluir");
         if (msgOk) await Carregar();
     }
     async Task Salvar()
     {
         erros.Clear();
+        if (formFaz <= 0) erros["faz"] = "Selecione a fazenda do lote.";
         if (Forms.Obrigatorio(lote, "o código do lote") is { } e1) erros["lote"] = e1;
         if (qtd <= 0) erros["qtd"] = "A quantidade deve ser maior que zero.";
         if (validade.Date < new DateTime(2000, 1, 1)) erros["val"] = "Informe uma validade válida.";
@@ -73,7 +118,7 @@ else
         try
         {
             var req = new LoteEstoqueRequest(bioId, lote.Trim(), qtd, un, validade, temp);
-            var r = editId == 0 ? await Http.PostAsJsonAsync($"api/propriedades/{S.PropriedadeId}/estoque", req) : await Http.PutAsJsonAsync($"api/propriedades/{S.PropriedadeId}/estoque/{editId}", req);
+            var r = editId == 0 ? await Http.PostAsJsonAsync($"api/propriedades/{formFaz}/estoque", req) : await Http.PutAsJsonAsync($"api/propriedades/{formFaz}/estoque/{editId}", req);
             msgOk = r.IsSuccessStatusCode;
             msg = msgOk ? (editId == 0 ? "Lote adicionado ao estoque." : "Lote atualizado.") : await Forms.ErroAsync(r, "Não foi possível salvar o lote");
             if (msgOk) { lote = ""; qtd = 0; temp = null; editId = 0; await Carregar(); }
