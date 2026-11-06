@@ -31,11 +31,21 @@ public class WhatsAppService(HttpClient http, IConfiguration cfg, AppDbContext d
         {
             // Instância ativa escolhida pelo admin (painel WhatsApp); cai no InstanceId do appsettings.
             var inst = await admin.InstanciaAtivaAsync(ct) ?? Instance;
-            using var req = !string.IsNullOrWhiteSpace(ApiKey)
-                ? new HttpRequestMessage(HttpMethod.Post, $"{Base}/v1/messages") { Content = JsonContent.Create(new { to = Normalizar(numero), type = "TEXT", text = texto, instanceId = inst }) }
-                : new HttpRequestMessage(HttpMethod.Post, $"{Base}/v1/instance/{inst}/messages/chat") { Content = JsonContent.Create(new { to = Normalizar(numero), body = texto }) };
-            if (!string.IsNullOrWhiteSpace(ApiKey)) req.Headers.Add("x-api-key", ApiKey); else req.Headers.Add("Token", Token);
-            using var resp = await http.SendAsync(req, ct);
+            Dictionary<string, object> Corpo(string? instancia) { var d = new Dictionary<string, object> { ["to"] = Normalizar(numero), ["type"] = "TEXT", ["text"] = texto }; if (!string.IsNullOrWhiteSpace(instancia)) d["instanceId"] = instancia; return d; }
+            HttpRequestMessage Montar(string? instancia) => !string.IsNullOrWhiteSpace(ApiKey)
+                ? new HttpRequestMessage(HttpMethod.Post, $"{Base}/v1/messages") { Content = JsonContent.Create(Corpo(instancia)) }
+                : new HttpRequestMessage(HttpMethod.Post, $"{Base}/v1/instance/{instancia}/messages/chat") { Content = JsonContent.Create(new { to = Normalizar(numero), body = texto }) };
+            void Auth(HttpRequestMessage r) { if (!string.IsNullOrWhiteSpace(ApiKey)) r.Headers.Add("x-api-key", ApiKey); else r.Headers.Add("Token", Token); }
+            using var req = Montar(inst); Auth(req);
+            var resp = await http.SendAsync(req, ct);
+            // Instância ativa apagada/inexistente na ApiEnvios: com a API key dá para omitir instanceId e deixar a conta usar a preferida.
+            if (resp.StatusCode == System.Net.HttpStatusCode.NotFound && !string.IsNullOrWhiteSpace(ApiKey))
+            {
+                resp.Dispose();
+                using var req2 = Montar(null); Auth(req2);
+                resp = await http.SendAsync(req2, ct);
+            }
+            using var _ = resp;
             if (!resp.IsSuccessStatusCode)
                 log.LogWarning("WhatsApp falhou {Status}: {Body}", (int)resp.StatusCode, await resp.Content.ReadAsStringAsync(ct));
             return resp.IsSuccessStatusCode;
