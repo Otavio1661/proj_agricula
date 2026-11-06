@@ -32,7 +32,7 @@ public class WhatsAppService(HttpClient http, IConfiguration cfg, AppDbContext d
             // Instância ativa escolhida pelo admin (painel WhatsApp); cai no InstanceId do appsettings.
             var inst = await admin.InstanciaAtivaAsync(ct) ?? Instance;
             using var req = !string.IsNullOrWhiteSpace(ApiKey)
-                ? new HttpRequestMessage(HttpMethod.Post, $"{Base}/v1/messages") { Content = JsonContent.Create(new { to = Normalizar(numero), type = "text", text = texto, instanceId = inst }) }
+                ? new HttpRequestMessage(HttpMethod.Post, $"{Base}/v1/messages") { Content = JsonContent.Create(new { to = Normalizar(numero), type = "TEXT", text = texto, instanceId = inst }) }
                 : new HttpRequestMessage(HttpMethod.Post, $"{Base}/v1/instance/{inst}/messages/chat") { Content = JsonContent.Create(new { to = Normalizar(numero), body = texto }) };
             if (!string.IsNullOrWhiteSpace(ApiKey)) req.Headers.Add("x-api-key", ApiKey); else req.Headers.Add("Token", Token);
             using var resp = await http.SendAsync(req, ct);
